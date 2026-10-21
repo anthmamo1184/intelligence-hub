@@ -24,7 +24,7 @@ CSS = """
 html, body, [class*="css"], [data-testid="stApp"] {font-family:'Share Tech Mono',monospace;}
 h1,h2,h3,[data-testid="stMetricLabel"],button,p label {font-family:'Oxanium',monospace!important;}
 .stApp {background:radial-gradient(ellipse at 80% 0%,#11283a 0%,#070d17 55%);}
-[data-testid="stMainBlockContainer"],.block-container{padding-top:6rem!important;max-width:1550px;padding-left:2rem;padding-right:2rem;}
+[data-testid="stMainBlockContainer"],.block-container{padding-top:4.5rem!important;max-width:1550px;padding-left:2rem;padding-right:2rem;}
 h1,h2,h3{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere!important;}
 .brief-title{font-family:Oxanium,monospace;font-size:1.15rem;line-height:1.5;color:#e1edf7;white-space:normal;overflow-wrap:anywhere;margin:0 0 1rem;}
 @media(max-width:700px){.block-container{padding-left:1rem;padding-right:1rem;}h1{font-size:1.45rem!important;letter-spacing:2px!important;}}
@@ -41,6 +41,10 @@ h3{font-size:1rem!important;}
 .sport-headline{font-family:Oxanium,monospace;font-size:.88rem;line-height:1.4;min-height:3.8em;}
 .meta{font-size:.73rem;color:#8ba5b9;}
 [data-testid="stDialog"]>div{background:#0d1928;border:1px solid #286070;}
+.mini-brand{font-family:Oxanium,monospace;font-size:.8rem;letter-spacing:2px;color:#7896aa;margin:0 0 .25rem;}
+.st-key-overview_kpis [data-testid="stMetric"]{padding:6px 10px!important;min-height:0!important;}
+.st-key-overview_kpis [data-testid="stMetricLabel"] p{font-size:.65rem!important;letter-spacing:.5px;}
+.st-key-overview_kpis [data-testid="stMetricValue"]{font-size:1.05rem!important;}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -646,7 +650,7 @@ def polling_panel():
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-05")
+    st.caption("REVISION 2026.10.21-06")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Alerts", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     watch = ""
@@ -656,9 +660,12 @@ with st.sidebar:
         st.cache_data.clear()
 
 
-st.markdown('<div class="tag">GLOBAL MONITORING / PERSONAL TERMINAL</div>', unsafe_allow_html=True)
-st.title("INTELLIGENCE HUB")
-st.caption("WORLD • POLITICS • ELECTIONS • MARKETS • COMMODITIES • SPORT")
+if section == "Overview":
+    st.markdown('<div class="tag">GLOBAL MONITORING / PERSONAL TERMINAL</div>', unsafe_allow_html=True)
+    st.title("INTELLIGENCE HUB")
+    st.caption("WORLD • POLITICS • ELECTIONS • MARKETS • COMMODITIES • SPORT")
+else:
+    st.markdown('<div class="mini-brand">◈ INTELLIGENCE HUB</div>', unsafe_allow_html=True)
 
 
 @st.fragment(run_every="180s" if auto else None)
@@ -671,13 +678,14 @@ def dashboard():
         items = [a for a in items if search.casefold() in (a["title"] + " " + a["summary"]).casefold()]
     keywords = [s.strip().casefold() for s in watch.split(",") if s.strip()]
     matches = [a for a in items if any(k in (a["title"] + " " + a["summary"]).casefold() for k in keywords)]
-    a, b, c, d = st.columns(4)
-    a.metric("STORIES IN WINDOW", len(items))
-    b.metric("AVAILABLE FEEDS", sum(map(len, FEEDS.values())) - len(errors))
-    c.metric("CHANNELS", len(FEEDS))
-    d.metric("CHECKED · MALTA", datetime.now(LOCAL).strftime("%H:%M"))
-    st.caption("Checked time is this dashboard check; publication times appear on each story. Feed responses may be cached for 3 minutes.")
-    st.divider()
+    if section == "Overview":
+        with st.container(key="overview_kpis"):
+            a, b, c, d = st.columns(4)
+            a.metric("STORIES IN WINDOW", len(items))
+            b.metric("AVAILABLE FEEDS", sum(map(len, FEEDS.values())) - len(errors))
+            c.metric("CHANNELS", len(FEEDS))
+            d.metric("CHECKED · MALTA", datetime.now(LOCAL).strftime("%H:%M"))
+        st.caption("Feed check · " + datetime.now(LOCAL).strftime("%H:%M Malta") + " · cached up to 3 minutes")
     if section == "Markets":
         markets_page()
     elif section == "Commodities":
