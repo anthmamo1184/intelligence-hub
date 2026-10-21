@@ -351,6 +351,12 @@ def chart_window(frame, period):
     return frame.loc[pd.to_datetime(frame["Date"], utc=True) >= cutoff].copy()
 
 
+def display_price(value, unit):
+    # Keep provider quote units exactly as supplied: GBp is pence, not GBP.
+    currency = unit if isinstance(unit, str) and re.fullmatch(r"[A-Za-z]{3}", unit) else ""
+    return f"{value:,.2f}" + (f" {currency}" if currency else "")
+
+
 def price_figure(frame, unit, candle=False, compact=False):
     fig = go.Figure()
     if frame.empty:
@@ -392,19 +398,53 @@ def market_dialog(name, symbol, unit, frame):
         return
     first, last = float(view["Close"].iloc[0]), float(view["Close"].iloc[-1])
     cols = st.columns(3)
-    cols[0].metric("LATEST", f"{last:,.2f}")
+    cols[0].metric("LATEST", display_price(last, unit))
     cols[1].metric("PERIOD CHANGE", f"{(last/first-1)*100:+.2f}%" if first else "—")
     cols[2].metric("OBSERVATIONS", len(view))
     st.plotly_chart(price_figure(view, unit, candle=style=="Candles"), use_container_width=True,
         config={"displaylogo":False,"scrollZoom":False,"modeBarButtonsToRemove":["lasso2d","select2d"]}, key="detail_plot_"+symbol)
     st.caption("Hover for prices · drag to zoom · double-click to reset · dotted line = first close in selected range")
+    if frame.attrs.get("conversion_note"):
+        st.caption(frame.attrs["conversion_note"])
     st.link_button("YAHOO FINANCE ↗", f"https://finance.yahoo.com/quote/{quote(symbol, safe='')}/")
     with st.expander("VIEW PRICE DATA"):
         st.dataframe(view.sort_values("Date", ascending=False), hide_index=True, use_container_width=True)
     st.caption("Prices may be delayed. Latest daily bar may still be in progress. Futures, where selected, can roll between contracts and are not spot or physical retail prices. Period change compares first and last available closes in the selected range.")
 
 
-def market_panel(names, assets=None, compact_controls=False):
+def convert_commodity(frame, unit, currency="USD", metal_weight="Troy oz", fx=None):
+    if frame is None or frame.empty:
+        return None, unit
+    out = frame.copy()
+    columns = [c for c in ["Open","High","Low","Close"] if c in out]
+    # Agricultural futures are quoted in US cents; normalise to dollars first.
+    if unit.startswith("US cents"):
+        out[columns] = out[columns]/100
+        unit = unit.replace("US cents", "USD", 1)
+    if currency == "EUR":
+        if fx is None or fx.empty:
+            return None, unit.replace("USD", "EUR")
+        out["_date"] = pd.to_datetime(out["Date"]).dt.tz_localize(None).dt.normalize()
+        rates = pd.DataFrame({"_fxdate":pd.to_datetime(fx["Date"]).dt.tz_localize(None).dt.normalize(),"_fx":pd.to_numeric(fx["Close"], errors="coerce")})
+        rates = rates.dropna().loc[lambda x:x["_fx"]>0].sort_values("_fxdate").drop_duplicates("_fxdate",keep="last")
+        if rates.empty:
+            return None, unit.replace("USD", "EUR")
+        out = pd.merge_asof(out.sort_values("_date"), rates, left_on="_date", right_on="_fxdate", direction="backward", tolerance=pd.Timedelta(days=7))
+        out = out.dropna(subset=["_fx"])
+        if out.empty:
+            return None, unit.replace("USD", "EUR")
+        out[columns] = out[columns].div(out["_fx"],axis=0)
+        out = out.drop(columns=["_date","_fxdate","_fx"])
+        unit = unit.replace("USD", "EUR", 1)
+        out.attrs["conversion_note"] = "EUR estimate uses historical EUR/USD daily closes (same date or preceding available date, at most 7 days earlier). Candle OHLC values use one FX close per day, not intraday EUR quotes. Unmatched observations are omitted."
+    if "troy oz" in unit and metal_weight == "Grams":
+        out[columns] = out[columns]/31.1034768
+        unit = unit.replace("troy oz", "gram")
+    out.attrs["currency"] = currency
+    return out, unit
+
+
+def market_panel(names, assets=None, compact_controls=False, commodity_currency=None, metal_weight="Troy oz"):
     assets = ASSETS if assets is None else assets
     if compact_controls:
         period = st.radio("Chart range", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, label_visibility="collapsed", key="market_range_"+section)
@@ -414,11 +454,18 @@ def market_panel(names, assets=None, compact_controls=False):
         st.caption("Price scales adapt to each asset. Teal = up over selected range; pink = down. Daily change appears beside the price.")
     with ThreadPoolExecutor(max_workers=4) as pool:
         frames = list(pool.map(lambda n: market_data(assets[n][0]), names))
+    fx = market_data("EURUSD=X") if commodity_currency == "EUR" else None
+    if commodity_currency == "EUR" and (fx is None or fx.empty):
+        st.warning("EUR conversion unavailable: exchange-rate feed could not be loaded. Select USD to view source prices.")
+    if commodity_currency == "EUR":
+        st.caption("EUR charts use historical daily EUR/USD rates; converted candles are estimates. Missing exchange-rate observations are omitted.")
     # Build actual rows so each asset keeps its position as cards change height.
     for offset in range(0, len(names), 3):
         cols = st.columns(3)
         for col, name, frame in zip(cols, names[offset:offset+3], frames[offset:offset+3]):
             symbol, unit = assets[name]
+            if commodity_currency is not None:
+                frame, unit = convert_commodity(frame, unit, commodity_currency, metal_weight, fx)
             with col, st.container(border=True):
                 if frame is None or frame.empty:
                     st.metric(name, "Unavailable")
@@ -430,8 +477,9 @@ def market_panel(names, assets=None, compact_controls=False):
                     close = float(frame["Close"].iloc[-1])
                     previous = float(frame["Close"].iloc[-2]) if len(frame)>1 else None
                     delta = f"{(close/previous-1)*100:+.2f}% vs prior close" if previous else None
-                    st.metric(name, f"{close:,.2f}", delta)
-                    st.caption(f'{unit} · {frame["Date"].iloc[-1]:%d %b %Y}')
+                    st.metric(name, display_price(close, unit), delta)
+                    unit_label = {"GBp": "GBp · British pence (100 GBp = 1 GBP)", "GBX": "GBX · British pence (100 GBX = 1 GBP)", "ZAc": "ZAc · South African cents", "ILA": "ILA · Israeli agorot"}.get(unit, unit)
+                    st.caption(f'{unit_label} · {frame["Date"].iloc[-1]:%d %b %Y}')
                     if view.empty:
                         st.info("No observations in selected range.")
                     else:
@@ -652,7 +700,7 @@ def polling_panel():
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-07")
+    st.caption("REVISION 2026.10.21-09")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Alerts", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     watch = ""
@@ -693,8 +741,14 @@ def dashboard():
     elif section == "Commodities":
         st.subheader("COMMODITIES")
         st.caption("Commodity quotes are futures, not spot prices.")
+        money, weight = st.columns(2)
+        currency = money.radio("Currency", ["USD", "EUR"], horizontal=True, key="commodity_currency")
+        metal_weight = weight.radio("Precious-metal weight", ["Troy oz", "Grams"], horizontal=True, key="metal_weight")
+        st.caption("Weight selector applies to gold, silver, platinum and palladium. Oil stays per barrel, gas per MMBtu, and other commodities retain their trading units. Agricultural cents are converted to dollars/euros.")
         choices = st.multiselect("Watchlist", list(ASSETS)[:11], default=list(ASSETS)[:6])
-        market_panel(choices)
+        market_panel(choices, commodity_currency=currency, metal_weight=metal_weight)
+        if currency == "EUR":
+            st.link_button("EUR/USD EXCHANGE-RATE SOURCE ↗", "https://finance.yahoo.com/quote/EURUSD%3DX/")
     elif section == "Sports":
         sports_panel()
     elif section == "US Elections":
