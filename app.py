@@ -59,7 +59,12 @@ h3{font-size:1rem!important;}
 .desk-excerpt{font-size:.78rem;line-height:1.5;color:#9db4c7;margin:.25rem 0 .65rem;}
 .pulse-name{font-family:Oxanium,monospace;font-size:.7rem;color:#9ebdca;}
 .pulse-price{font-family:"Share Tech Mono",monospace;font-size:1.05rem;color:#e1edf7;white-space:nowrap;}
-.st-key-overview_pulse [data-testid="stVerticalBlock"]{gap:.1rem;}
+.st-key-overview_pulse [data-testid="stVerticalBlock"]{gap:.4rem!important;}
+.pulse-header{display:block;min-height:94px;box-sizing:border-box;}
+.pulse-header .pulse-name{display:block;line-height:18px;margin:0 0 5px;}
+.pulse-header .pulse-price{display:block;line-height:26px;margin:0 0 4px;font-size:1.05rem;}
+.pulse-detail{display:block;font-size:.68rem;line-height:17px;color:#91a8ba;overflow-wrap:anywhere;}
+.pulse-delta{display:block;font-size:.72rem;line-height:18px;}
 .st-key-overview_pulse [data-testid="stCaptionContainer"] p{font-size:.62rem;}
 </style>
 """
@@ -984,15 +989,21 @@ def overview_panel(items, errors):
     with st.container(key="overview_pulse"):
         for col, (name, (symbol, unit)), frame in zip(st.columns(6), basket.items(), frames):
             with col, st.container(border=True):
-                st.markdown(f'<div class="pulse-name">{escape(name)}</div>', unsafe_allow_html=True)
                 if frame is None or frame.empty:
-                    st.caption("Unavailable")
+                    st.markdown(f'<div class="pulse-header"><div class="pulse-name">{escape(name)}</div><div class="pulse-price">—</div><div class="pulse-delta" style="color:#91a8ba">Unavailable</div><div class="pulse-detail">No quote returned</div></div>',unsafe_allow_html=True)
+                    empty=go.Figure()
+                    empty.update_layout(height=50,margin=dict(l=0,r=0,t=0,b=0),paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",xaxis=dict(visible=False),yaxis=dict(visible=False))
+                    st.plotly_chart(empty,use_container_width=True,config={"displayModeBar":False},key="pulse_"+symbol)
+                    st.caption("Date unavailable")
+                    st.button("↗",key="pulse_open_"+symbol,disabled=True,use_container_width=True)
                     continue
                 close = float(frame["Close"].iloc[-1])
                 prior = float(frame["Close"].iloc[-2]) if len(frame)>1 else None
                 change = (close/prior-1)*100 if prior else None
-                st.markdown(f'<div class="pulse-price">{close:,.4f}</div>' if name == "EUR / USD" else f'<div class="pulse-price">{close:,.2f}</div>', unsafe_allow_html=True)
-                st.caption((f"{change:+.2f}%" if change is not None else "—") + " · " + unit)
+                value = f"{close:,.4f}" if name == "EUR / USD" else f"{close:,.2f}"
+                delta = f"{change:+.2f}%" if change is not None else "—"
+                tone = "#40e0d0" if change is not None and change>=0 else "#ff6b86" if change is not None else "#91a8ba"
+                st.markdown(f'<div class="pulse-header"><div class="pulse-name">{escape(name)}</div><div class="pulse-price">{value}</div><div class="pulse-delta" style="color:{tone}">{delta}</div><div class="pulse-detail">{escape(unit)}</div></div>',unsafe_allow_html=True)
                 view = chart_window(frame, "1M")
                 if not view.empty:
                     color = "#40e0d0" if float(view["Close"].iloc[-1]) >= float(view["Close"].iloc[0]) else "#ff6b86"
@@ -1032,7 +1043,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-16")
+    st.caption("REVISION 2026.10.21-17")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
