@@ -109,6 +109,31 @@ h3{font-size:1rem!important;}
   .st-key-sports_desk [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4)) > [data-testid="stColumn"]{flex:0 0 calc(50% - .3rem)!important;width:calc(50% - .3rem)!important;min-width:0!important;}
 }
 
+
+/* Preserve the native accessible toggle and support both Streamlit header variants. */
+:is([data-testid="stSidebarCollapsedControl"] button, button[data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"] button, button[data-testid="stExpandSidebarButton"], button[aria-label="Expand sidebar"]){min-width:46px!important;min-height:44px!important;color:#9eece8!important;background:#101f2e!important;border:1px solid #285269!important;border-radius:6px!important;}
+:is([data-testid="stSidebarCollapsedControl"] button, button[data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"] button, button[data-testid="stExpandSidebarButton"], button[aria-label="Expand sidebar"]) > *{display:none!important;}
+:is([data-testid="stSidebarCollapsedControl"] button, button[data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"] button, button[data-testid="stExpandSidebarButton"], button[aria-label="Expand sidebar"])::after{content:"☰";font-family:Arial,sans-serif;font-size:25px;line-height:1;}
+@media(max-width:767px){
+    [data-testid="stHorizontalBlock"]{flex-wrap:wrap!important;gap:.6rem!important;}
+    [data-testid="stSidebar"]{max-width:86vw!important;}
+    [data-testid="stSidebar"] [data-testid="stRadio"] label{min-height:40px;align-items:center;}
+    [data-testid="stSelectbox"] input,[data-testid="stMultiSelect"] input{font-size:16px!important;}
+    [data-testid="stMetric"]{padding:7px 9px!important;}
+    [data-testid="stMetricValue"]{font-size:1.3rem!important;line-height:1.4!important;white-space:normal!important;}
+    [data-testid="stMetricLabel"] p{font-size:.76rem!important;line-height:1.4!important;}
+    [data-testid="stCaptionContainer"] p{line-height:1.5;}
+    .st-key-commodity_controls > [data-testid="stVerticalBlock"]{gap:.4rem!important;}
+    .st-key-commodity_controls [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{flex:0 0 calc(50% - .35rem)!important;width:calc(50% - .35rem)!important;min-width:0!important;}
+    .st-key-commodity_controls [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3){flex-basis:100%!important;width:100%!important;}
+    .st-key-markets_compact_page [data-testid="stForm"] [data-testid="stColumn"]:first-child{flex:1 1 calc(100% - 100px)!important;width:calc(100% - 100px)!important;min-width:0!important;}
+    .st-key-markets_compact_page [data-testid="stForm"] [data-testid="stColumn"]:last-child{flex:0 0 84px!important;width:84px!important;min-width:0!important;}
+    .st-key-us_election_kpis [data-testid="stColumn"]{flex:0 0 calc(50% - .35rem)!important;width:calc(50% - .35rem)!important;min-width:0!important;}
+    [data-testid="stPopover"] button{min-height:44px!important;width:100%;}
+    [data-testid="stDialog"] [data-testid="stVerticalBlock"]{min-width:0!important;}
+    .headline{font-size:.95rem;line-height:1.5;}
+}
+
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -816,11 +841,12 @@ def us_elections_panel():
     st.subheader("US ELECTIONS / CONGRESSIONAL CONTROL")
     election_day = datetime(2026,11,3,tzinfo=ZoneInfo("America/New_York"))
     days = (election_day.date()-datetime.now(ZoneInfo("America/New_York")).date()).days
-    cols=st.columns(4)
-    cols[0].metric("ELECTION DAY", "03 NOV 2026")
-    cols[1].metric("DAYS TO ELECTION", max(days,0))
-    cols[2].metric("HOUSE SEATS", "435")
-    cols[3].metric("SENATE TOTAL", "100")
+    with st.container(key="us_election_kpis"):
+        cols=st.columns(4)
+        cols[0].metric("ELECTION DAY", "03 NOV 2026")
+        cols[1].metric("DAYS TO ELECTION", max(days,0))
+        cols[2].metric("HOUSE SEATS", "435")
+        cols[3].metric("SENATE TOTAL", "100")
     st.caption("Congress = House of Representatives + Senate. All House seats and roughly one-third of Senate seats are elected every two years.")
     page=st.radio("US election view",["Control & seats","Published polling","Seat simulator","Reporting & sources"],horizontal=True,key="us_view")
     if page=="Control & seats":
@@ -1284,7 +1310,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-23")
+    st.caption("REVISION 2026.10.21-24")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
