@@ -667,21 +667,70 @@ def us_elections_panel():
         stories(entries,"us_election_news",12)
 
 
+def is_national_election(title, country, jurisdiction="", election_type=""):
+    # Conservative scope: uncertain events are omitted rather than shown as national.
+    text=(title+" "+election_type).casefold()
+    excluded=r"\b(regional|local|municipal|mayoral|governor|gubernatorial|provincial|state|district|county|council|assembly constituency|by[ -]?elections?|special elections?|primar(?:y|ies)|leadership|party presidential|referend(?:um|a))\b"
+    if re.search(excluded,text):
+        return False
+    if not country or country in ["Unspecified", ""]:
+        return False
+    if jurisdiction and jurisdiction.casefold() != country.casefold():
+        return False
+    office=r"\b(presidential|parliamentary|general election|general elections|legislative|national assembly|national council|federal election|federal elections|congressional|senate election|senate elections|house of representatives election|house of representatives elections)\b"
+    if not re.search(office,text):
+        return False
+    if jurisdiction.casefold()==country.casefold():
+        return True
+    # Missing jurisdiction must still have a country-level name, not a regional name.
+    demonyms = {
+        "Brazil":"Brazilian", "United States":"American", "France":"French", "United Kingdom":"British",
+        "Germany":"German", "Italy":"Italian", "Spain":"Spanish", "Portugal":"Portuguese",
+        "Netherlands":"Dutch", "Belgium":"Belgian", "Austria":"Austrian", "Switzerland":"Swiss",
+        "Sweden":"Swedish", "Norway":"Norwegian", "Denmark":"Danish", "Finland":"Finnish",
+        "Poland":"Polish", "Czech Republic":"Czech", "Czechia":"Czech", "Greece":"Greek",
+        "Turkey":"Turkish", "Türkiye":"Turkish", "Hungary":"Hungarian", "Romania":"Romanian",
+        "Russia":"Russian", "Ukraine":"Ukrainian", "Ireland":"Irish", "Iceland":"Icelandic",
+        "Malta":"Maltese", "Cyprus":"Cypriot", "Canada":"Canadian", "Mexico":"Mexican",
+        "Argentina":"Argentine", "Chile":"Chilean", "Colombia":"Colombian", "Peru":"Peruvian",
+        "Australia":"Australian", "New Zealand":"New Zealand", "Japan":"Japanese", "South Korea":"South Korean",
+        "India":"Indian", "Pakistan":"Pakistani", "Bangladesh":"Bangladeshi", "Indonesia":"Indonesian",
+        "Philippines":"Philippine", "Malaysia":"Malaysian", "Thailand":"Thai", "Israel":"Israeli",
+        "South Africa":"South African", "Nigeria":"Nigerian", "Kenya":"Kenyan", "Ghana":"Ghanaian",
+        "Egypt":"Egyptian", "Morocco":"Moroccan", "Senegal":"Senegalese", "Taiwan":"Taiwanese"
+    }
+    names=[country,demonyms.get(country, country)]
+    return any(re.search(r"(?<!\w)"+re.escape(name)+r"(?!\w)",title,re.I) for name in names)
+
+
 @st.cache_data(ttl=21600, show_spinner=False)
 def elections_calendar():
     now = datetime.now(UTC)
     start, end = (now - timedelta(days=7)).date(), (now + timedelta(days=180)).date()
-    query = '''SELECT DISTINCT ?election ?electionLabel ?date ?countryLabel WHERE {
+    query = '''SELECT DISTINCT ?election ?electionLabel ?date ?countryLabel ?jurisdictionLabel ?electionTypeLabel WHERE {
       ?election wdt:P31/wdt:P279* wd:Q40231; wdt:P585 ?date.
       FILTER(?date >= "STARTT00:00:00Z"^^xsd:dateTime && ?date <= "ENDT23:59:59Z"^^xsd:dateTime)
-      OPTIONAL { ?election wdt:P17 ?country. }
+      ?election wdt:P17 ?country.
+      OPTIONAL { ?election wdt:P1001 ?jurisdiction. }
+      OPTIONAL { ?election wdt:P31 ?electionType. }
       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-    } ORDER BY ?date LIMIT 60'''.replace("START", str(start)).replace("END", str(end))
+    } ORDER BY ?date LIMIT 1000'''.replace("START", str(start)).replace("END", str(end))
     try:
         r = requests.get("https://query.wikidata.org/sparql", params={"query": query, "format": "json"}, headers=HEADERS, timeout=15)
         r.raise_for_status()
         rows = r.json()["results"]["bindings"]
-        return [dict(Election=x["electionLabel"]["value"], Country=x.get("countryLabel", {}).get("value", "Unspecified"), Date=x["date"]["value"][:10], Source=x["election"]["value"]) for x in rows], None
+        result,seen=[],set()
+        for x in rows:
+            title=x["electionLabel"]["value"]
+            country=x.get("countryLabel",{}).get("value","")
+            jurisdiction=x.get("jurisdictionLabel",{}).get("value","")
+            kind=x.get("electionTypeLabel",{}).get("value","")
+            key=(x["election"]["value"],x["date"]["value"][:10])
+            if key in seen or not is_national_election(title,country,jurisdiction,kind):
+                continue
+            seen.add(key)
+            result.append(dict(Election=title,Country=country,Date=key[1],Source=key[0]))
+        return result, None
     except Exception:
         return [], "Election calendar feed is unavailable. Election reporting below remains available."
 
@@ -920,7 +969,7 @@ def world_monitor(items):
             st.dataframe(pd.DataFrame(upcoming[:12]),hide_index=True,use_container_width=True,column_config={"Source":st.column_config.LinkColumn("Source ↗")})
         else:
             st.caption("No upcoming calendar entries available on this check.")
-        st.caption("Wikidata community-maintained calendar · six-hour cache · verify dates at election authorities. Polls/results require original verified sources. Map boundaries: world.geo.json / Natural Earth; boundaries are illustrative.")
+        st.caption("National elections only · Wikidata community-maintained calendar · six-hour cache · verify dates at election authorities. Polls/results require original verified sources. Map boundaries: world.geo.json / Natural Earth; boundaries are illustrative.")
 
 
 def overview_panel(items, errors):
@@ -983,7 +1032,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-15")
+    st.caption("REVISION 2026.10.21-16")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
@@ -1039,7 +1088,7 @@ def dashboard():
         us_elections_panel()
     elif section == "Elections":
         st.subheader("WORLD ELECTION WATCH")
-        st.caption("Calendar covers the previous 7 days and next 180 days. Community-maintained dates may be incomplete or change; verify at source.")
+        st.caption("Major national presidential and parliamentary/congressional elections only · previous 7 days / next 180 days. Regional, local, by-elections and primaries excluded. Unclear scope is omitted; verify dates at source.")
         rows, error = elections_calendar()
         if error:
             st.warning(error)
