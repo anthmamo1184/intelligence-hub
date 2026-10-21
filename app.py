@@ -66,6 +66,9 @@ h3{font-size:1rem!important;}
 .pulse-detail{display:block;font-size:.68rem;line-height:17px;color:#91a8ba;overflow-wrap:anywhere;}
 .pulse-delta{display:block;font-size:.72rem;line-height:18px;}
 .st-key-overview_pulse [data-testid="stCaptionContainer"] p{font-size:.62rem;}
+.st-key-markets_compact_page [data-testid="stMetric"]{padding:5px 8px!important;}
+.st-key-markets_compact_page [data-testid="stMetricValue"]{font-size:1.12rem!important;line-height:1.4!important;}
+.st-key-markets_compact_page [data-testid="stCaptionContainer"] p{font-size:.68rem;line-height:1.45;}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -133,6 +136,17 @@ MARKET_PRESETS = {
     "USD / BRL": ("BRL=X", "BRL per USD"), "EUR / BRL": ("EURBRL=X", "BRL per EUR"),
     "Bitcoin": ("BTC-USD", "USD"), "Ethereum": ("ETH-USD", "USD"),
 }
+
+
+MAJOR_COMPANIES = {
+    "NVIDIA": ("NVDA", "Quote currency"), "Microsoft": ("MSFT", "Quote currency"),
+    "Apple": ("AAPL", "Quote currency"), "Amazon": ("AMZN", "Quote currency"),
+    "Alphabet / Google": ("GOOGL", "Quote currency"), "Meta": ("META", "Quote currency"),
+    "Tesla": ("TSLA", "Quote currency"), "AMD": ("AMD", "Quote currency"),
+    "Broadcom": ("AVGO", "Quote currency"),
+}
+MARKET_PRESETS.update(MAJOR_COMPANIES)
+DEFAULT_MARKETS = ["NVIDIA", "Microsoft", "Apple", "S&P 500", "Amazon", "Alphabet / Google", "Meta", "Nasdaq", "Tesla", "AMD", "Broadcom", "Dow Jones"]
 
 
 SPORT_FEEDS = {
@@ -626,9 +640,10 @@ def market_panel(names, assets=None, compact_controls=False, commodity_currency=
         st.warning("EUR conversion unavailable: exchange-rate feed could not be loaded. Select USD to view source prices.")
 
     # Build actual rows so each asset keeps its position as cards change height.
-    for offset in range(0, len(names), 3):
-        cols = st.columns(3)
-        for col, name, frame in zip(cols, names[offset:offset+3], frames[offset:offset+3]):
+    columns_per_row = 4 if compact_controls else 3
+    for offset in range(0, len(names), columns_per_row):
+        cols = st.columns(columns_per_row)
+        for col, name, frame in zip(cols, names[offset:offset+columns_per_row], frames[offset:offset+columns_per_row]):
             symbol, unit = assets[name]
             if commodity_currency is not None:
                 frame, unit = convert_commodity(frame, unit, commodity_currency, metal_weight, fx)
@@ -649,14 +664,25 @@ def market_panel(names, assets=None, compact_controls=False, commodity_currency=
                     if view.empty:
                         st.info("No observations in selected range.")
                     else:
-                        st.plotly_chart(price_figure(view, unit, compact=True), use_container_width=True,
+                        figure=price_figure(view, unit, compact=True)
+                        if compact_controls:
+                            figure.update_layout(height=125,margin=dict(l=2,r=5,t=15,b=2))
+                            figure.update_xaxes(nticks=3)
+                            figure.update_yaxes(nticks=3)
+                        st.plotly_chart(figure, use_container_width=True,
                             config={"displayModeBar":False,"scrollZoom":False}, key="card_plot_"+symbol)
                         first = float(view["Close"].iloc[0])
                         change = (float(view["Close"].iloc[-1])/first-1)*100 if first else None
                         st.caption(f'{period} change {change:+.2f}% · Low {view["Close"].min():,.2f} / High {view["Close"].max():,.2f}' if change is not None else "Period change unavailable")
-                    if st.button("EXPAND CHART ↗", key="market_"+symbol, use_container_width=True):
+                    if compact_controls:
+                        detail,source=st.columns([2,1])
+                        if detail.button("EXPAND ↗", key="market_"+symbol, use_container_width=True):
+                            market_dialog(name, symbol, unit, frame)
+                        source.link_button("SOURCE",f"https://finance.yahoo.com/quote/{quote(symbol,safe='')}/",use_container_width=True)
+                    elif st.button("EXPAND CHART ↗", key="market_"+symbol, use_container_width=True):
                         market_dialog(name, symbol, unit, frame)
-                st.link_button("SOURCE ↗", f"https://finance.yahoo.com/quote/{quote(symbol, safe='')}/")
+                if not compact_controls or frame is None or frame.empty:
+                    st.link_button("SOURCE ↗", f"https://finance.yahoo.com/quote/{quote(symbol, safe='')}/")
     if compact_controls:
         st.caption("Yahoo Finance · daily prices may be delayed · teal/pink shows selected-period movement · watchlist lasts for this session")
 
@@ -702,7 +728,7 @@ def markets_page():
         if add.button("+ ADD", use_container_width=True, help="Add listing to charts below"):
             label = selected["name"]+" · "+selected["symbol"]
             st.session_state.company_watchlist[label] = (selected["symbol"], "Quote currency")
-            current = st.session_state.get("global_market_selection", ["S&P 500","Nasdaq","Dow Jones"])
+            current = st.session_state.get("global_market_selection", DEFAULT_MARKETS)
             if label not in current:
                 st.session_state.global_market_selection = current+[label]
         if view.button("VIEW", use_container_width=True, help="Open detailed price chart"):
@@ -719,8 +745,10 @@ def markets_page():
         st.info("No listings found. Try a ticker or shorter name.")
     registry = {**MARKET_PRESETS, **st.session_state.company_watchlist}
     with st.expander("EDIT WATCHLIST", expanded=False):
+        if st.button("LOAD MAJOR COMPANIES + INDICES",key="load_market_defaults"):
+            st.session_state.global_market_selection=DEFAULT_MARKETS.copy()
         choices = st.multiselect("Markets and companies",list(registry),
-            default=["S&P 500","Nasdaq","Dow Jones"]+list(st.session_state.company_watchlist),
+            default=DEFAULT_MARKETS+list(st.session_state.company_watchlist),
             key="global_market_selection")
         st.caption("Choose indices, currencies, crypto or added companies. Choices last for this session.")
     if choices:
@@ -1024,6 +1052,26 @@ def country_monitor(code):
         st.caption("Reporting is separate from official polling/results. No verified polling dataset is currently connected.")
 
 
+def election_countdowns(rows):
+    today=datetime.now(UTC).date()
+    result=[]
+    for row in rows:
+        try:
+            days=(datetime.fromisoformat(row["Date"]).date()-today).days
+        except (ValueError,TypeError,KeyError):
+            continue
+        if days>=0:
+            result.append(dict(row,**{"Days to vote":days}))
+    return sorted(result,key=lambda r:r["Days to vote"])
+
+
+def map_highlight(conflict,election,coverage):
+    if conflict and election:return "#e785c6"
+    if conflict:return "#eeaa55"
+    if election:return "#a995ff"
+    return "#40e0d0" if coverage else "#102537"
+
+
 def world_monitor(items):
     st.subheader("WORLD MONITOR")
     controls,selector=st.columns([1.2,1])
@@ -1034,7 +1082,15 @@ def world_monitor(items):
         selection=st.selectbox("Find a country",[None]+ordered,format_func=lambda code: "Search / select any country…" if code is None else catalog[code]["name"],key="country_picker",label_visibility="collapsed")
         if selection and st.button("OPEN COUNTRY ↗",key="open_picked_country",use_container_width=True):
             open_country(selection)
+    with st.popover("★ COUNTRY FAVOURITES"):
+        favourites=st.multiselect("Pin countries",ordered,default=[],format_func=lambda code:catalog[code]["name"],max_selections=6,key="country_favourites")
+        st.caption("Blank by default · saved for your current browser session only")
+    if favourites:
+        for col,code in zip(st.columns(len(favourites)),favourites):
+            if col.button(catalog[code]["name"],key="favourite_country_"+code,use_container_width=True):
+                open_country(code)
     counts={}
+    conflict_counts,election_counts={},{}
     for item in items:
         text=item["title"]+" "+item["summary"]
         if layer=="Conflicts" and not re.search(CONFLICT_WORDS,text,re.I):
@@ -1043,6 +1099,10 @@ def world_monitor(items):
             continue
         for code in country_mentions(text,catalog):
             counts[code]=counts.get(code,0)+1
+            if re.search(CONFLICT_WORDS,text,re.I):
+                conflict_counts[code]=conflict_counts.get(code,0)+1
+            if re.search(ELECTION_WORDS,text,re.I):
+                election_counts[code]=election_counts.get(code,0)+1
     calendar_rows,calendar_error=elections_calendar() if layer in ["All","Elections"] else ([],None)
     elections={}
     today=datetime.now(UTC).date().isoformat()
@@ -1072,10 +1132,15 @@ def world_monitor(items):
             props["Articles"]=counts.get(code,0)
             props["Calendar elections"]=len(elections.get(code,[]))
             props["highlight"]=bool(props["Articles"] or props["Calendar elections"])
+            conflict=bool(conflict_counts.get(code)) if layer in ["All","Conflicts"] else False
+            election=bool(election_counts.get(code) or elections.get(code)) if layer in ["All","Elections"] else False
+            props["fill"]=map_highlight(conflict,election,props["Articles"])
+            dates=election_countdowns(elections.get(code,[]))
+            props["Next national vote"]=f'{dates[0]["Date"]} · {dates[0]["Days to vote"]} days' if dates else "No calendar entry"
             f["properties"]=props
             features.append(f)
         boundaries={"type":"FeatureCollection","features":features}
-        folium.GeoJson(boundaries,name="Countries",style_function=lambda f:{"fillColor":color if f["properties"]["highlight"] else "#102537","color":"#426275","weight":.6,"fillOpacity":.50 if f["properties"]["highlight"] else .13},highlight_function=lambda f:{"weight":2,"color":"#8cffff","fillOpacity":.7},tooltip=folium.GeoJsonTooltip(fields=["Country","Articles","Calendar elections"],aliases=["Country","Retrieved articles","Upcoming calendar entries"],sticky=False),embed=True).add_to(m)
+        folium.GeoJson(boundaries,name="Countries",style_function=lambda f:{"fillColor":f["properties"]["fill"],"color":"#426275","weight":.6,"fillOpacity":.50 if f["properties"]["highlight"] else .13},highlight_function=lambda f:{"weight":2,"color":"#8cffff","fillOpacity":.7},tooltip=folium.GeoJsonTooltip(fields=["Country","Articles","Calendar elections","Next national vote"],aliases=["Country","Retrieved articles","Upcoming calendar entries","Next national vote"],sticky=False),embed=True).add_to(m)
         result=st_folium(m,height=410,use_container_width=True,key="world_map_"+layer,returned_objects=["last_clicked"])
         click=result.get("last_clicked") if result else None
         fingerprint=(layer,click.get("lat"),click.get("lng")) if click else None
@@ -1089,6 +1154,7 @@ def world_monitor(items):
                     break
     else:
         st.info("Map boundaries are unavailable. Select a country above to open its briefing.")
+    st.markdown('<div style="font-size:.75rem;line-height:1.7"><span style="color:#eeaa55">● Conflict reporting</span> &nbsp; <span style="color:#a995ff">● Election news / dates</span> &nbsp; <span style="color:#e785c6">● Both</span> &nbsp; <span style="color:#40e0d0">● Other coverage</span></div>',unsafe_allow_html=True)
     st.caption("Click a country or use search. Highlighting means country mentions in retrieved reports"+(" or upcoming calendar entries." if layer in ["All","Elections"] else "."))
     st.caption("Conflicts uses keyword-matched reporting, not verified war-zone boundaries. Mentions can concern several countries. No highlight does not imply no conflict or election.")
     if calendar_error:
@@ -1100,7 +1166,7 @@ def world_monitor(items):
             if col.button(f'{catalog[code]["name"]} · {counts[code]}',key="country_shortcut_"+code,use_container_width=True):
                 open_country(code)
     with st.expander("ELECTION DATES / SOURCES",expanded=False):
-        upcoming=[dict(r) for r in calendar_rows if r["Date"]>=today]
+        upcoming=election_countdowns(calendar_rows)
         if upcoming:
             st.dataframe(pd.DataFrame(upcoming[:12]),hide_index=True,use_container_width=True,column_config={"Source":st.column_config.LinkColumn("Source ↗")})
         else:
@@ -1176,7 +1242,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-20")
+    st.caption("REVISION 2026.10.21-22")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
@@ -1211,7 +1277,8 @@ def dashboard():
         stamps=[r["Checked"] for r in st.session_state.get("feed_health",[])]
         st.caption("Feeds fetched "+(elapsed_label(min(stamps)) if stamps else "time unavailable")+" · cached up to 3 minutes · details in Feed Health")
     if section == "Markets":
-        markets_page()
+        with st.container(key="markets_compact_page"):
+            markets_page()
     elif section == "Commodities":
         st.subheader("COMMODITIES")
         with st.container(key="commodity_controls"):
@@ -1238,7 +1305,11 @@ def dashboard():
         if error:
             st.warning(error)
         elif rows:
-            st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True, column_config={"Source": st.column_config.LinkColumn("Calendar source")})
+            display_rows=[]
+            for row in rows:
+                days=(datetime.fromisoformat(row["Date"]).date()-datetime.now(UTC).date()).days
+                display_rows.append(dict(row,**{"Days to vote":days if days>=0 else "Held"}))
+            st.dataframe(pd.DataFrame(display_rows), hide_index=True, use_container_width=True, column_config={"Source": st.column_config.LinkColumn("Calendar source")})
         else:
             st.info("No dated elections returned by the calendar source.")
         st.caption("Poll charts appear only when verified original-source data is connected. No worldwide polling feed is currently connected.")
