@@ -134,6 +134,30 @@ h3{font-size:1rem!important;}
     .headline{font-size:.95rem;line-height:1.5;}
 }
 
+
+/* Constrain the popup to the viewport and scroll the brief independently. */
+[data-testid="stDialog"] [role="dialog"],
+[data-testid="stDialog"][role="dialog"],
+[data-baseweb="modal"] [role="dialog"]{
+    max-height:calc(100vh - 2rem)!important;
+    max-height:calc(100dvh - 2rem)!important;
+    overflow-y:auto!important;
+    overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;
+}
+.st-key-brief_scroll{
+    max-height:65vh!important;max-height:65dvh!important;
+    overflow-y:auto!important;overflow-x:hidden!important;
+    min-height:0!important;padding-right:.6rem;
+    overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;
+    scrollbar-gutter:stable;
+}
+.st-key-brief_scroll::-webkit-scrollbar{width:7px;}
+.st-key-brief_scroll::-webkit-scrollbar-thumb{background:#426275;border-radius:4px;}
+@media(max-width:767px){
+    .st-key-brief_scroll{max-height:60vh!important;max-height:60dvh!important;padding-right:.35rem;}
+}
+
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -482,29 +506,30 @@ def article_preview(url):
 def story_dialog(item):
     st.markdown(f'<div class="brief-title">{escape(item["title"])}</div>', unsafe_allow_html=True)
     st.caption(f'{item["source"]} · {timestamp(item["published"])}')
-    summary = short_preview(item["summary"], 280)
-    with st.spinner("Loading source preview…"):
-        preview = article_preview(item["url"])
-    # Prefer a longer source excerpt; never pad a short feed with generated claims.
-    text = preview if len(preview.split()) > len(summary.split()) else summary
-    if text:
-        st.markdown("#### REPORT BRIEF")
-        sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9“\"])", text)
-        paragraph, length = [], 0
-        for sentence in sentences:
-            paragraph.append(sentence)
-            length += len(sentence.split())
-            if length >= 65:
+    with st.container(key="brief_scroll",border=False):
+        summary = short_preview(item["summary"], 280)
+        with st.spinner("Loading source preview…"):
+            preview = article_preview(item["url"])
+        # Prefer a longer source excerpt; never pad a short feed with generated claims.
+        text = preview if len(preview.split()) > len(summary.split()) else summary
+        if text:
+            st.markdown("#### REPORT BRIEF")
+            sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9“\"])", text)
+            paragraph, length = [], 0
+            for sentence in sentences:
+                paragraph.append(sentence)
+                length += len(sentence.split())
+                if length >= 65:
+                    st.write(" ".join(paragraph))
+                    paragraph, length = [], 0
+            if paragraph:
                 st.write(" ".join(paragraph))
-                paragraph, length = [], 0
-        if paragraph:
-            st.write(" ".join(paragraph))
-    else:
-        st.write("Open the original report to read the story.")
-    if len(text.split()) < 50:
-        st.caption("Only a short preview is available from this source. Read the full report below.")
-    st.link_button("OPEN ORIGINAL REPORT ↗", item["url"], use_container_width=True)
-    st.caption("Source excerpt · up to 280 words when accessible · not an AI-written analysis. Inclusion does not independently verify claims.")
+        else:
+            st.write("Open the original report to read the story.")
+        if len(text.split()) < 50:
+            st.caption("Only a short preview is available from this source. Read the full report below.")
+        st.link_button("OPEN ORIGINAL REPORT ↗", item["url"], use_container_width=True)
+        st.caption("Source excerpt · up to 280 words when accessible · not an AI-written analysis. Inclusion does not independently verify claims.")
 
 
 def stories(items, prefix, limit=18):
@@ -1310,7 +1335,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-24")
+    st.caption("REVISION 2026.10.21-25")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
