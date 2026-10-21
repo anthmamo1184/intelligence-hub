@@ -404,11 +404,14 @@ def market_dialog(name, symbol, unit, frame):
     st.caption("Prices may be delayed. Latest daily bar may still be in progress. Futures, where selected, can roll between contracts and are not spot or physical retail prices. Period change compares first and last available closes in the selected range.")
 
 
-def market_panel(names, assets=None):
+def market_panel(names, assets=None, compact_controls=False):
     assets = ASSETS if assets is None else assets
-    st.caption("Yahoo Finance · latest daily observations · prices may be delayed · cached 10 minutes")
-    period = st.radio("TIME RANGE", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, key="market_range_"+section)
-    st.caption("Price scales adapt to each asset. Teal = up over selected range; pink = down. Daily change appears beside the price.")
+    if compact_controls:
+        period = st.radio("Chart range", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, label_visibility="collapsed", key="market_range_"+section)
+    else:
+        st.caption("Yahoo Finance · latest daily observations · prices may be delayed · cached 10 minutes")
+        period = st.radio("TIME RANGE", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, key="market_range_"+section)
+        st.caption("Price scales adapt to each asset. Teal = up over selected range; pink = down. Daily change appears beside the price.")
     with ThreadPoolExecutor(max_workers=4) as pool:
         frames = list(pool.map(lambda n: market_data(assets[n][0]), names))
     # Build actual rows so each asset keeps its position as cards change height.
@@ -440,6 +443,8 @@ def market_panel(names, assets=None):
                     if st.button("EXPAND CHART ↗", key="market_"+symbol, use_container_width=True):
                         market_dialog(name, symbol, unit, frame)
                 st.link_button("SOURCE ↗", f"https://finance.yahoo.com/quote/{quote(symbol, safe='')}/")
+    if compact_controls:
+        st.caption("Yahoo Finance · daily prices may be delayed · teal/pink shows selected-period movement · watchlist lasts for this session")
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -455,62 +460,59 @@ def company_search(query):
 
 
 def markets_page():
-    st.subheader("MARKETS / COMPANY SEARCH")
+    st.subheader("MARKETS")
     if "company_watchlist" not in st.session_state:
         st.session_state.company_watchlist = {}
-    with st.form("company_search_form"):
-        query = st.text_input("Company name or ticker", placeholder="e.g. Apple, Nvidia, Betsson, AAPL…")
-        submitted = st.form_submit_button("SEARCH COMPANIES", use_container_width=True)
+    with st.form("company_search_form", border=False):
+        field, button = st.columns([5,1])
+        query = field.text_input("Company name or ticker", placeholder="Search company or ticker…", label_visibility="collapsed")
+        submitted = button.form_submit_button("SEARCH", use_container_width=True)
     if submitted:
         st.session_state.pop("company_result", None)
         if query.strip():
-            with st.spinner("Searching Yahoo Finance…"):
+            with st.spinner("Searching…"):
                 rows, error = company_search(query.strip()[:100])
             st.session_state.company_results = rows
             st.session_state.company_error = error
         else:
             st.session_state.company_results = []
-            st.session_state.company_error = "Enter a company name or ticker to search."
+            st.session_state.company_error = "Enter a company name or ticker."
     if st.session_state.get("company_error"):
         st.info(st.session_state.company_error)
     results = st.session_state.get("company_results", [])
     if results:
-        selected = st.selectbox("Matching listings — check the exchange", results,
-            format_func=lambda r:f'{r["name"]} · {r["symbol"]} · {r["exchange"]} · {r["kind"]}',
-            key="company_result")
-        st.caption("Different exchanges can quote the same company in different currencies. The chart displays the provider's quote currency.")
-        left, right = st.columns(2)
-        if left.button("ADD TO MY WATCHLIST", use_container_width=True):
-            label = selected["name"] + " · " + selected["symbol"]
+        listing, add, view, dismiss = st.columns([5,1,1,1])
+        selected = listing.selectbox("Matching listings — check the exchange", results,
+            format_func=lambda r:f'{r["name"]} · {r["symbol"]} · {r["exchange"]}',
+            key="company_result", label_visibility="collapsed")
+        if add.button("+ ADD", use_container_width=True, help="Add listing to charts below"):
+            label = selected["name"]+" · "+selected["symbol"]
             st.session_state.company_watchlist[label] = (selected["symbol"], "Quote currency")
-            current = st.session_state.get("global_market_selection", ["S&P 500", "Nasdaq", "Dow Jones"])
+            current = st.session_state.get("global_market_selection", ["S&P 500","Nasdaq","Dow Jones"])
             if label not in current:
-                st.session_state.global_market_selection = current + [label]
-            st.success("Added to your session watchlist.")
-        if right.button("OPEN COMPANY CHART", use_container_width=True):
-            with st.spinner("Loading company history…"):
+                st.session_state.global_market_selection = current+[label]
+        if view.button("VIEW", use_container_width=True, help="Open detailed price chart"):
+            with st.spinner("Loading chart…"):
                 frame = market_data(selected["symbol"])
             if frame is None or frame.empty:
-                st.info("Price history is unavailable for this listing.")
+                st.info("Price history unavailable for this listing.")
             else:
-                market_dialog(selected["name"], selected["symbol"], frame.attrs.get("currency", "Quote currency unavailable"), frame)
+                market_dialog(selected["name"],selected["symbol"],frame.attrs.get("currency","Quote currency unavailable"),frame)
+        if dismiss.button("CLOSE", use_container_width=True, help="Hide search results"):
+            st.session_state.company_results = []
+            st.rerun()
     elif submitted and not st.session_state.get("company_error"):
-        st.info("No matching listings found. Try the company's ticker or a shorter name.")
+        st.info("No listings found. Try a ticker or shorter name.")
     registry = {**MARKET_PRESETS, **st.session_state.company_watchlist}
-    st.divider()
-    st.subheader("GLOBAL WATCHLIST")
-    choices = st.multiselect("Markets and companies", list(registry),
-        default=["S&P 500", "Nasdaq", "Dow Jones"] + list(st.session_state.company_watchlist),
-        key="global_market_selection")
-    # New additions should appear immediately even when the user has already customised this widget.
-    missing = [n for n in st.session_state.company_watchlist if n not in choices]
-    if missing:
-        st.caption("Added companies are available in the selector above: " + ", ".join(missing))
+    with st.expander("EDIT WATCHLIST", expanded=False):
+        choices = st.multiselect("Markets and companies",list(registry),
+            default=["S&P 500","Nasdaq","Dow Jones"]+list(st.session_state.company_watchlist),
+            key="global_market_selection")
+        st.caption("Choose indices, currencies, crypto or added companies. Choices last for this session.")
     if choices:
-        market_panel(choices, registry)
+        market_panel(choices,registry,compact_controls=True)
     else:
-        st.info("Choose markets or companies to display their charts.")
-    st.caption("Company watchlist and search choices last for this browser session only.")
+        st.info("Open Edit watchlist to choose markets, or search for a company above.")
 
 
 US_PEW_SOURCE = "https://www.pewresearch.org/politics/2026/10/08/with-americans-in-a-sour-mood-democratic-voters-are-more-engaged-in-midterms/"
@@ -650,7 +652,7 @@ def polling_panel():
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-06")
+    st.caption("REVISION 2026.10.21-07")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Alerts", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     watch = ""
