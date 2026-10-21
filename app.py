@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import feedparser
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import requests
 import streamlit as st
 import yfinance as yf
@@ -32,6 +33,7 @@ h3{font-size:1rem!important;}
 .stButton>button:hover{border-color:#40e0d0;box-shadow:0 0 12px #40e0d022;}
 .tag{color:#40e0d0;letter-spacing:2px;font-size:.72rem;}
 .headline{font-family:'Oxanium',monospace;font-size:1rem;line-height:1.5;color:#e1edf7;}
+.sport-headline{font-family:Oxanium,monospace;font-size:.88rem;line-height:1.4;min-height:3.8em;}
 .meta{font-size:.73rem;color:#8ba5b9;}
 [data-testid="stDialog"]>div{background:#0d1928;border:1px solid #286070;}
 </style>
@@ -56,6 +58,18 @@ ASSETS = {
     "Wheat": ("ZW=F", "US cents / bushel"), "Corn": ("ZC=F", "US cents / bushel"),
     "Coffee": ("KC=F", "US cents / lb"), "S&P 500": ("^GSPC", "index points"),
     "Nasdaq": ("^IXIC", "index points"), "Dow Jones": ("^DJI", "index points"),
+}
+
+
+SPORT_FEEDS = {
+    "All Sports": ("BBC Sport", "https://feeds.bbci.co.uk/sport/rss.xml"),
+    "Football": ("BBC Football", "https://feeds.bbci.co.uk/sport/football/rss.xml"),
+    "Tennis": ("BBC Tennis", "https://feeds.bbci.co.uk/sport/tennis/rss.xml"),
+    "Basketball": ("BBC Basketball", "https://feeds.bbci.co.uk/sport/basketball/rss.xml"),
+    "Motorsports": ("BBC Motorsport", "https://feeds.bbci.co.uk/sport/motorsport/rss.xml"),
+    "General": ("BBC Sport", "https://feeds.bbci.co.uk/sport/rss.xml"),
+    "Cricket": ("BBC Cricket", "https://feeds.bbci.co.uk/sport/cricket/rss.xml"),
+    "Rugby": ("BBC Rugby Union", "https://feeds.bbci.co.uk/sport/rugby-union/rss.xml"),
 }
 
 
@@ -138,54 +152,160 @@ def stories(items, prefix, limit=18):
             right.link_button("SOURCE ↗", item["url"], use_container_width=True)
 
 
+def sports_panel():
+    st.subheader("SPORTS / NEWS DESK")
+    options = list(SPORT_FEEDS)
+    if "sports_choice" not in st.session_state:
+        st.session_state.sports_choice = "All Sports"
+    for start in range(0, len(options), 4):
+        for col, label in zip(st.columns(4), options[start:start+4]):
+            if col.button(label.upper(), key="sport_filter_"+label,
+                          type="primary" if st.session_state.sports_choice == label else "secondary",
+                          use_container_width=True):
+                st.session_state.sports_choice = label
+                st.rerun()
+    choice = st.session_state.sports_choice
+    source, url = SPORT_FEEDS[choice]
+    jobs = [(source, url)]
+    if choice == "Motorsports":
+        jobs.append(("BBC Formula 1", "https://feeds.bbci.co.uk/sport/formula1/rss.xml"))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda job: fetch_feed("Sports", *job), jobs))
+    rows, seen = [], set()
+    for entries, error in results:
+        if error:
+            st.caption(error)
+        for row in entries:
+            if row["url"] not in seen:
+                rows.append(row)
+                seen.add(row["url"])
+    cutoff = datetime.now(UTC)-timedelta(hours=age)
+    rows = [r for r in rows if r["published"] and datetime.fromisoformat(r["published"]) >= cutoff]
+    if search.strip():
+        rows = [r for r in rows if search.casefold() in (r["title"]+" "+r["summary"]).casefold()]
+    if choice == "General":
+        rows = [r for r in rows if not re.search(r"/(football|tennis|basketball|motorsport|formula1|cricket|rugby-union)/", r["url"])]
+    rows.sort(key=lambda r:r["published"] or "", reverse=True)
+    st.caption(f"{choice.upper()} · {len(rows)} stories in selected window · General shows other sports from the main feed")
+    if not rows:
+        st.info("No stories available for this sport in the selected window. Try a wider story window.")
+    for start in range(0,len(rows),3):
+        for col,item in zip(st.columns(3),rows[start:start+3]):
+            with col,st.container(border=True):
+                st.markdown(f'<div class="tag">{escape(choice.upper())}</div><div class="sport-headline">{escape(item["title"])}</div>',unsafe_allow_html=True)
+                st.caption(f'{item["source"]} · {timestamp(item["published"])}')
+                left,right=st.columns(2)
+                uid=hashlib.sha256(item["url"].encode()).hexdigest()[:16]
+                if left.button("BRIEF",key="sport_brief_"+uid,use_container_width=True):
+                    story_dialog(item)
+                right.link_button("SOURCE ↗",item["url"],use_container_width=True)
+
+
 @st.cache_data(ttl=600, show_spinner=False)
 def market_data(symbol):
     try:
-        data = yf.Ticker(symbol).history(period="3mo", interval="1d", auto_adjust=False, timeout=12)
+        data = yf.Ticker(symbol).history(period="1y", interval="1d", auto_adjust=False, timeout=12)
         if data.empty:
             return None
-        data = data.dropna(subset=["Close"])
-        if data.empty:
-            return None
+        data = data.dropna(subset=["Close"]).sort_index()
         frame = data.reset_index()
-        return frame[["Date", "Close"]]
+        return frame[[c for c in ["Date", "Open", "High", "Low", "Close"] if c in frame.columns]]
     except Exception:
         return None
 
 
+def chart_window(frame, period):
+    days = {"1M": 30, "3M": 90, "6M": 180, "1Y": 366}[period]
+    cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days)
+    return frame.loc[pd.to_datetime(frame["Date"], utc=True) >= cutoff].copy()
+
+
+def price_figure(frame, unit, candle=False, compact=False):
+    fig = go.Figure()
+    if frame.empty:
+        return fig
+    first, last = float(frame["Close"].iloc[0]), float(frame["Close"].iloc[-1])
+    color = "#40e0d0" if last >= first else "#ff6b86"
+    candles = candle and {"Open", "High", "Low"}.issubset(frame.columns)
+    if candles:
+        fig.add_trace(go.Candlestick(x=frame["Date"], open=frame["Open"], high=frame["High"], low=frame["Low"], close=frame["Close"], increasing_line_color="#40e0d0", decreasing_line_color="#ff6b86", name="Daily OHLC"))
+        low, high = float(frame["Low"].min()), float(frame["High"].max())
+    else:
+        fig.add_trace(go.Scatter(x=frame["Date"], y=frame["Close"], mode="lines", line=dict(color=color, width=2), name="Daily close", connectgaps=False, hovertemplate="%{x|%d %b %Y}<br><b>%{y:,.2f}</b> " + unit + "<extra></extra>"))
+        low, high = float(frame["Close"].min()), float(frame["Close"].max())
+    pad = max((high - low) * .15, abs(last) * .002, .001)
+    fig.add_hline(y=first, line_dash="dot", line_color="#516579", line_width=1)
+    fig.add_trace(go.Scatter(x=[frame["Date"].iloc[-1]], y=[last], mode="markers", marker=dict(color=color, size=7), showlegend=False, hoverinfo="skip"))
+    fig.add_annotation(x=1, xref="paper", y=last, text=f"{last:,.2f}", showarrow=False, xanchor="right", yshift=13, font=dict(color=color, size=11), bgcolor="#101c2c")
+    fig.update_layout(template="plotly_dark", height=195 if compact else 430,
+        margin=dict(l=6, r=8, t=20, b=5), showlegend=False,
+        font=dict(family="Share Tech Mono, monospace", color="#a8becf", size=10 if compact else 12),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        hovermode="x unified", hoverlabel=dict(bgcolor="#142638", font_size=12),
+        dragmode=False if compact else "zoom",
+        xaxis=dict(showgrid=False, tickformat="%d %b", nticks=4 if compact else 7, rangeslider_visible=False, fixedrange=compact, showspikes=True, spikemode="across"),
+        yaxis=dict(range=[low-pad, high+pad], side="right", gridcolor="#203044", zeroline=False, tickformat=",.2f", nticks=4 if compact else 6, fixedrange=compact))
+    return fig
+
+
 @st.dialog("MARKET DETAIL", width="large")
 def market_dialog(name, symbol, unit, frame):
-    st.subheader(name)
+    st.subheader(name.upper())
     st.caption(f"Yahoo Finance · {symbol} · {unit} · Daily observations")
-    fig = px.line(frame, x="Date", y="Close", template="plotly_dark")
-    fig.update_traces(line_color="#40e0d0")
-    fig.update_layout(height=320, margin=dict(l=5, r=5, t=10, b=5), yaxis_title=unit, paper_bgcolor="#0d1928", plot_bgcolor="#0d1928")
-    st.plotly_chart(fig, use_container_width=True)
+    left, right = st.columns(2)
+    period = left.radio("Chart range", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, key="detail_range_"+symbol)
+    style = right.radio("Display", ["Line", "Candles"], horizontal=True, key="detail_style_"+symbol)
+    view = chart_window(frame, period)
+    if view.empty:
+        st.info("No observations in this time range.")
+        return
+    first, last = float(view["Close"].iloc[0]), float(view["Close"].iloc[-1])
+    cols = st.columns(3)
+    cols[0].metric("LATEST", f"{last:,.2f}")
+    cols[1].metric("PERIOD CHANGE", f"{(last/first-1)*100:+.2f}%" if first else "—")
+    cols[2].metric("OBSERVATIONS", len(view))
+    st.plotly_chart(price_figure(view, unit, candle=style=="Candles"), use_container_width=True,
+        config={"displaylogo":False,"scrollZoom":False,"modeBarButtonsToRemove":["lasso2d","select2d"]}, key="detail_plot_"+symbol)
+    st.caption("Hover for prices · drag to zoom · double-click to reset · dotted line = first close in selected range")
     st.link_button("YAHOO FINANCE ↗", f"https://finance.yahoo.com/quote/{quote(symbol, safe='')}/")
-    st.caption("Futures series may roll between contracts. Prices may be delayed; not spot metal or physical retail prices.")
+    with st.expander("VIEW PRICE DATA"):
+        st.dataframe(view.sort_values("Date", ascending=False), hide_index=True, use_container_width=True)
+    st.caption("Prices may be delayed. Latest daily bar may still be in progress. Futures can roll between contracts; these are not spot or physical retail prices. Period change compares first and last available closes in the selected range.")
 
 
 def market_panel(names):
-    st.caption("Yahoo Finance · latest available daily observations · cached 10 minutes · commodities are futures, not spot quotes")
+    st.caption("Yahoo Finance · daily observations · cached 10 minutes · commodities are futures, not spot quotes")
+    period = st.radio("TIME RANGE", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, key="market_range_"+section)
+    st.caption("Price scales adapt to each asset. Teal = up over selected range; pink = down. Daily change appears beside the price.")
     with ThreadPoolExecutor(max_workers=4) as pool:
         frames = list(pool.map(lambda n: market_data(ASSETS[n][0]), names))
-    cols = st.columns(3)
-    for i, (name, frame) in enumerate(zip(names, frames)):
-        symbol, unit = ASSETS[name]
-        with cols[i % 3], st.container(border=True):
-            if frame is None:
-                st.metric(name, "Unavailable")
-                st.caption("Feed unavailable; no substitute price shown.")
-            else:
-                close = float(frame["Close"].iloc[-1])
-                previous = float(frame["Close"].iloc[-2]) if len(frame) > 1 else None
-                delta = f"{(close / previous - 1) * 100:+.2f}%" if previous else None
-                st.metric(name, f"{close:,.2f}", delta)
-                st.caption(f'{unit} · observation {frame["Date"].iloc[-1]:%d %b %Y}')
-                st.line_chart(frame.set_index("Date")["Close"], height=90, color="#40e0d0")
-                if st.button("EXPAND CHART", key="market_" + symbol, use_container_width=True):
-                    market_dialog(name, symbol, unit, frame)
-            st.link_button("SOURCE ↗", f"https://finance.yahoo.com/quote/{quote(symbol, safe='')}/")
+    # Build actual rows so each asset keeps its position as cards change height.
+    for offset in range(0, len(names), 3):
+        cols = st.columns(3)
+        for col, name, frame in zip(cols, names[offset:offset+3], frames[offset:offset+3]):
+            symbol, unit = ASSETS[name]
+            with col, st.container(border=True):
+                if frame is None or frame.empty:
+                    st.metric(name, "Unavailable")
+                    st.caption("Feed unavailable; no substitute price shown.")
+                else:
+                    view = chart_window(frame, period)
+                    close = float(frame["Close"].iloc[-1])
+                    previous = float(frame["Close"].iloc[-2]) if len(frame)>1 else None
+                    delta = f"{(close/previous-1)*100:+.2f}% vs prior close" if previous else None
+                    st.metric(name, f"{close:,.2f}", delta)
+                    st.caption(f'{unit} · {frame["Date"].iloc[-1]:%d %b %Y}')
+                    if view.empty:
+                        st.info("No observations in selected range.")
+                    else:
+                        st.plotly_chart(price_figure(view, unit, compact=True), use_container_width=True,
+                            config={"displayModeBar":False,"scrollZoom":False}, key="card_plot_"+symbol)
+                        first = float(view["Close"].iloc[0])
+                        change = (float(view["Close"].iloc[-1])/first-1)*100 if first else None
+                        st.caption(f'{period} change {change:+.2f}% · Low {view["Close"].min():,.2f} / High {view["Close"].max():,.2f}' if change is not None else "Period change unavailable")
+                    if st.button("EXPAND CHART ↗", key="market_"+symbol, use_container_width=True):
+                        market_dialog(name, symbol, unit, frame)
+                st.link_button("SOURCE ↗", f"https://finance.yahoo.com/quote/{quote(symbol, safe='')}/")
 
 
 @st.cache_data(ttl=21600, show_spinner=False)
@@ -280,6 +400,8 @@ def dashboard():
         defaults = list(ASSETS)[:6] if section == "Commodities" else list(ASSETS)[11:]
         choices = st.multiselect("Watchlist", list(ASSETS), default=defaults)
         market_panel(choices)
+    elif section == "Sports":
+        sports_panel()
     elif section == "Elections":
         st.subheader("WORLD ELECTION WATCH")
         st.caption("Calendar covers the previous 7 days and next 180 days. Community-maintained dates may be incomplete or change; verify at source.")
