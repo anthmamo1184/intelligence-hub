@@ -336,13 +336,13 @@ def story_dialog(item):
 def stories(items, prefix, limit=18):
     if not items:
         st.info("No matching stories. Try a wider filter, or check source status.")
-    for item in items[:limit]:
+    for story_index, item in enumerate(items[:limit]):
         with st.container(border=True):
             st.markdown(f'<div class="tag">{escape(item["category"].upper())}</div><div class="headline">{escape(item["title"])}</div>', unsafe_allow_html=True)
             st.caption(f'{item["source"]} · {timestamp(item["published"])}')
             left, right = st.columns([1, 1])
             uid = hashlib.sha256(item["url"].encode()).hexdigest()[:16]
-            if left.button("OPEN BRIEF", key=f"{prefix}_{uid}", use_container_width=True):
+            if left.button("OPEN BRIEF", key=f"{prefix}_{story_index}_{uid}", use_container_width=True):
                 story_dialog(item)
             right.link_button("SOURCE ↗", item["url"], use_container_width=True)
 
@@ -823,7 +823,7 @@ def news_desk(items, channel, scope=None):
     if channel == "Conflicts":
         st.caption("Regional reporting includes non-conflict stories. Claims are attributed to publishers; article counts do not measure military activity.")
     for start in range(0,min(limit,len(rows)),3):
-        for col,item in zip(st.columns(3),rows[start:min(start+3,limit)]):
+        for card_index,(col,item) in enumerate(zip(st.columns(3),rows[start:min(start+3,limit)]),start=start):
             with col,st.container(border=True):
                 st.markdown(f'<div class="sport-headline">{escape(item["title"])}</div>',unsafe_allow_html=True)
                 st.caption(f'{item["source"]} · {timestamp(item["published"])}')
@@ -831,7 +831,7 @@ def news_desk(items, channel, scope=None):
                     st.markdown(f'<div class="desk-excerpt">{escape(short_preview(item["summary"],42))}</div>',unsafe_allow_html=True)
                 left,right=st.columns(2)
                 uid=hashlib.sha256(item["url"].encode()).hexdigest()[:16]
-                if left.button("BRIEF",key=f"desk_{scope}_{uid}",use_container_width=True):
+                if left.button("BRIEF",key=f"desk_{scope}_{card_index}_{uid}",use_container_width=True):
                     story_dialog(item)
                 right.link_button("SOURCE ↗",item["url"],use_container_width=True)
 
@@ -1054,16 +1054,27 @@ def overview_panel(items, errors):
     for tab, channel in zip(st.tabs(channels), channels):
         with tab:
             selected = items if channel == "All" else [a for a in items if a["category"] == channel]
+            # One article can belong to several desks. Keep one copy per Overview tab.
+            seen_urls, seen_titles, unique = set(), set(), []
+            for article in selected:
+                title_key=re.sub(r"\W", "", article["title"]).casefold()
+                url_key=article["url"]
+                if url_key in seen_urls or title_key in seen_titles:
+                    continue
+                seen_urls.add(url_key)
+                seen_titles.add(title_key)
+                unique.append(article)
+            selected=unique
             if not selected:
                 st.caption("No matching stories in this window.")
             for offset in range(0, min(6, len(selected)), 2):
-                for col, item in zip(st.columns(2), selected[offset:offset+2]):
+                for card_index, (col, item) in enumerate(zip(st.columns(2), selected[offset:offset+2]), start=offset):
                     with col, st.container(border=True):
                         st.markdown(f'<div class="tag">{escape(item["category"].upper())}</div><div class="sport-headline">{escape(item["title"])}</div>', unsafe_allow_html=True)
                         st.caption(f'{item["source"]} · {timestamp(item["published"])}')
                         a, b = st.columns(2)
                         uid = hashlib.sha256(item["url"].encode()).hexdigest()[:16]
-                        if a.button("OPEN BRIEF", key=f"ov_{channel}_{uid}", use_container_width=True):
+                        if a.button("OPEN BRIEF", key=f"ov_{channel}_{card_index}_{uid}", use_container_width=True):
                             story_dialog(item)
                         b.link_button("SOURCE ↗", item["url"], use_container_width=True)
     with st.expander("FEED HEALTH"):
@@ -1075,7 +1086,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-18")
+    st.caption("REVISION 2026.10.21-19")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
