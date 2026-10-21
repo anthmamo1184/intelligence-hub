@@ -16,6 +16,7 @@ import plotly.graph_objects as go
 import requests
 import streamlit as st
 import yfinance as yf
+import trafilatura
 
 st.set_page_config(page_title="INTELLIGENCE HUB", page_icon="◈", layout="wide")
 CSS = """
@@ -47,6 +48,8 @@ h3{font-size:1rem!important;}
 .st-key-overview_kpis [data-testid="stMetricValue"]{font-size:1.05rem!important;}
 .st-key-commodity_controls [data-testid="stVerticalBlock"]{gap:.25rem!important;}
 .st-key-commodity_controls{margin-bottom:.15rem;}
+.st-key-overview_pulse [data-testid="stMetric"]{padding:4px 8px!important;border:0;background:transparent;}
+.st-key-overview_pulse [data-testid="stMetricValue"]{font-size:1.2rem!important;}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -211,7 +214,7 @@ def article_body(node):
     return ""
 
 
-def short_preview(text, words=160):
+def short_preview(text, words=280):
     tokens = clean(text).split()
     return " ".join(tokens[:words]) + (" …" if len(tokens)>words else "")
 
@@ -232,6 +235,10 @@ def article_preview(url):
             response.raise_for_status()
             if "html" not in response.headers.get("Content-Type", ""):
                 return ""
+            extracted = trafilatura.extract(response.text[:2000000], url=url,
+                include_comments=False, include_tables=False, favor_precision=True)
+            if extracted and len(extracted.split()) >= 80:
+                return short_preview(extracted, 280)
             parser = ArticlePreviewParser()
             parser.feed(response.text[:2000000])
             for script in parser.scripts:
@@ -242,7 +249,7 @@ def article_preview(url):
                 except (ValueError, TypeError):
                     continue
             if parser.paragraphs:
-                return short_preview(" ".join(parser.paragraphs[:5]))
+                return short_preview(" ".join(parser.paragraphs[:10]), 280)
             return short_preview(parser.description)
         return ""
     except Exception:
@@ -253,19 +260,29 @@ def article_preview(url):
 def story_dialog(item):
     st.markdown(f'<div class="brief-title">{escape(item["title"])}</div>', unsafe_allow_html=True)
     st.caption(f'{item["source"]} · {timestamp(item["published"])}')
-    summary = short_preview(item["summary"], 180)
+    summary = short_preview(item["summary"], 280)
     with st.spinner("Loading source preview…"):
         preview = article_preview(item["url"])
     # Prefer a longer source excerpt; never pad a short feed with generated claims.
     text = preview if len(preview.split()) > len(summary.split()) else summary
     if text:
-        st.write(text)
+        st.markdown("#### REPORT BRIEF")
+        sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9“\"])", text)
+        paragraph, length = [], 0
+        for sentence in sentences:
+            paragraph.append(sentence)
+            length += len(sentence.split())
+            if length >= 65:
+                st.write(" ".join(paragraph))
+                paragraph, length = [], 0
+        if paragraph:
+            st.write(" ".join(paragraph))
     else:
         st.write("Open the original report to read the story.")
     if len(text.split()) < 50:
         st.caption("Only a short preview is available from this source. Read the full report below.")
     st.link_button("OPEN ORIGINAL REPORT ↗", item["url"], use_container_width=True)
-    st.caption("Source excerpt, up to approximately 160–180 words where available. Some publishers provide shorter previews. Inclusion does not independently verify claims.")
+    st.caption("Source excerpt · up to 280 words when accessible · not an AI-written analysis. Inclusion does not independently verify claims.")
 
 
 def stories(items, prefix, limit=18):
@@ -566,7 +583,7 @@ def markets_page():
         st.info("Open Edit watchlist to choose markets, or search for a company above.")
 
 
-US_PEW_SOURCE = "https://www.pewresearch.org/politics/2026/10/08/with-americans-in-a-sour-mood-democratic-voters-are-more-engaged-in-midterms/"
+
 
 
 def election_bar(labels, values, title, percent=False):
@@ -606,25 +623,15 @@ def us_elections_panel():
             st.link_button("OFFICIAL SENATE MEMBERSHIP ↗","https://www.senate.gov/senators/")
             st.caption("Senate directory retrieved 21 Oct 2026.")
     elif page=="Published polling":
-        st.markdown("### HOUSE VOTING INTENTION")
-        st.caption("Dated snapshot · Pew Research Center · Published 8 Oct 2026 · Fieldwork 28 Sep–4 Oct 2026 · 3,917 registered voters")
-        st.plotly_chart(election_bar(["Democrats","Republicans","Other candidate","Not sure"],[44,36,5,15],"NATIONAL HOUSE PREFERENCE / SINGLE POLL",True),use_container_width=True)
-        st.caption("Democratic lead: 8 percentage points in this poll. This is a national voting-intention survey, not an exit poll, polling average, Senate-race poll or seat forecast. It is not necessarily the latest available poll.")
-        st.link_button("POLL / FULL METHODOLOGY ↗",US_PEW_SOURCE)
-        st.markdown("### VOTER ENGAGEMENT")
-        fig=go.Figure()
-        for name,values,color in [("Democratic candidate supporters",[78,50,63],"#4c9dff"),("Republican candidate supporters",[69,36,46],"#ff627d")]:
-            fig.add_trace(go.Bar(name=name,x=["Party control really matters","Given election a lot of thought","Extremely motivated to vote"],y=values,marker_color=color,text=[str(v)+"%" for v in values],textposition="auto"))
-        fig.update_layout(template="plotly_dark",barmode="group",height=340,yaxis=dict(range=[0,100],title="Supporters (%)"),legend=dict(orientation="h",y=1.2),margin=dict(t=70,b=10),paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig,use_container_width=True)
-        st.caption("Same Pew survey and fieldwork. These percentages describe engagement among each party's supporters, not vote share or likelihood of winning.")
-        if days>0:
-            st.info("EXIT POLLS / VOTER SURVEYS: general-election figures are not yet available. Pre-election opinion polls are shown separately above.")
+        st.markdown("### OFFICIAL POLLING SOURCES")
+        st.info("No verified official polling dataset is connected. Poll percentages and trends will appear only when a dated dataset can be linked directly to the original polling organisation.")
+        st.link_button("PEW RESEARCH / POLITICS ↗", "https://www.pewresearch.org/politics/")
+        st.link_button("GALLUP / POLITICS ↗", "https://news.gallup.com/poll/173314/politics.aspx")
+        st.caption("These are source directories, not live polling feeds. Opinion polls are surveys from polling organisations; certified results come from election authorities.")
+        if days > 0:
+            st.info("General-election exit polls are not yet available.")
         else:
-            st.info("EXIT POLLS / RESULTS: no live licensed election-night feed is connected. This app does not display exit-poll percentages or live race calls.")
-        st.link_button("AP VOTER POLL / EXPLANATION ↗","https://www.ap.org/elections/our-role-in-the-u-s-elections/how-we-survey-the-electorate/")
-        st.markdown("### ADD MORE SOURCED POLLS")
-        polling_panel()
+            st.info("No verified exit-poll or live results feed is connected.")
     elif page=="Seat simulator":
         st.warning("ILLUSTRATIVE SCENARIO — manually selected seats, not a model, poll estimate or prediction.")
         house=st.slider("Hypothetical Democratic House seats",0,435,214,key="sim_house")
@@ -639,11 +646,11 @@ def us_elections_panel():
         st.link_button("USAGOV / HOW CONGRESSIONAL ELECTIONS WORK ↗","https://www.usa.gov/midterm-elections")
         st.link_button("HOUSE / MEMBERSHIP ↗","https://radiotv.house.gov/house-data/party-breakdown")
         st.link_button("SENATE / MEMBERSHIP ↗","https://www.senate.gov/senators/")
-        st.link_button("PEW / POLLING REPORT ↗",US_PEW_SOURCE)
+        st.link_button("PEW / POLLING REPORT ↗","https://www.pewresearch.org/politics/")
         st.link_button("AP / ELECTION SURVEY METHODS ↗","https://www.ap.org/elections/our-role-in-the-u-s-elections/how-we-survey-the-electorate/")
         entries,error=fetch_feed("US Elections","Google News · US elections","https://news.google.com/rss/search?"+urlencode({"q":"US midterm House Senate election when:7d","hl":"en-US","gl":"US","ceid":"US:en"}))
         if error:st.caption(error)
-        st.caption("Latest retrieved reporting below is refreshed from the news feed; membership and polling snapshots above retain their stated dates.")
+        st.caption("Latest retrieved reporting below is refreshed from the news feed; membership snapshots above retain their stated dates.")
         stories(entries,"us_election_news",12)
 
 
@@ -666,47 +673,111 @@ def elections_calendar():
         return [], "Election calendar feed is unavailable. Election reporting below remains available."
 
 
-def polling_panel():
-    st.subheader("POLLING LAB")
-    st.caption("Real polling only. No automatic worldwide polling provider is connected in this first version.")
-    upload = st.file_uploader("Load a sourced polling CSV", type="csv", key="polls")
-    st.download_button("DOWNLOAD CSV TEMPLATE", "country,election,pollster,fieldwork_end,party,percent,sample_size,source_url\n", "polling_template.csv", "text/csv")
-    if upload is None:
-        st.info("Upload polling data to unlock country filters, poll points and trend graphs. No invented poll figures are displayed.")
-        return
-    try:
-        df = pd.read_csv(upload)
-        required = {"country", "election", "pollster", "fieldwork_end", "party", "percent", "sample_size", "source_url"}
-        if not required.issubset(df.columns):
-            raise ValueError("CSV must include: " + ", ".join(sorted(required)))
-        if df.empty or df[list(required)].isna().any().any():
-            raise ValueError("Provide complete polling rows, including source links and sample sizes.")
-        df["fieldwork_end"] = pd.to_datetime(df["fieldwork_end"], errors="raise", utc=True)
-        df["percent"] = pd.to_numeric(df["percent"], errors="raise")
-        df["sample_size"] = pd.to_numeric(df["sample_size"], errors="raise")
-        if not df["percent"].between(0, 100).all() or not (df["sample_size"] > 0).all():
-            raise ValueError("Percent must be between 0 and 100; sample size must be positive.")
-        if not df["source_url"].map(lambda u: bool(safe_url(u))).all():
-            raise ValueError("Each poll needs an HTTP or HTTPS source link.")
-        country = st.selectbox("Country", sorted(df["country"].unique()))
-        df = df[df["country"] == country]
-        election = st.selectbox("Election", sorted(df["election"].unique()))
-        df = df[df["election"] == election].sort_values("fieldwork_end")
-        fig = px.scatter(df, x="fieldwork_end", y="percent", color="party", symbol="pollster", hover_data=["pollster", "sample_size", "source_url"], template="plotly_dark", labels={"fieldwork_end": "Fieldwork end", "percent": "Voting intention (%)"})
-        fig.update_layout(height=400, yaxis_range=[0, 100])
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption("Individual published poll points; no poll average or seat projection calculated. Uploaded data lasts for this session only.")
-        st.dataframe(df, hide_index=True, column_config={"source_url": st.column_config.LinkColumn("Source")})
-    except Exception as exc:
-        st.error(f"Polling CSV could not be loaded: {exc}")
+def overview_panel(items, errors):
+    st.subheader("MARKET PULSE")
+    basket = {name: ASSETS[name] if name in ASSETS else MARKET_PRESETS[name]
+              for name in ["S&P 500", "Nasdaq", "Gold", "Silver", "Brent oil", "EUR / USD"]}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        frames = list(pool.map(lambda name: market_data(basket[name][0]), basket))
+    movements = []
+    with st.container(key="overview_pulse"):
+        for offset in range(0, len(basket), 3):
+            for col, name, frame in zip(st.columns(3), list(basket)[offset:offset+3], frames[offset:offset+3]):
+                symbol, unit = basket[name]
+                with col, st.container(border=True):
+                    if frame is None or frame.empty:
+                        st.metric(name, "Unavailable")
+                        continue
+                    close = float(frame["Close"].iloc[-1])
+                    previous = float(frame["Close"].iloc[-2]) if len(frame) > 1 else None
+                    change = (close / previous - 1) * 100 if previous else None
+                    st.metric(name, f"{close:,.4f}" if " / " in name else f"{close:,.2f}",
+                              f"{change:+.2f}%" if change is not None else None)
+                    st.caption(f'{unit} · {frame["Date"].iloc[-1]:%d %b %Y}')
+                    view = chart_window(frame, "1M")
+                    if not view.empty:
+                        fig = price_figure(view, unit, compact=True)
+                        fig.update_layout(height=105, margin=dict(l=0, r=0, t=0, b=0))
+                        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar":False}, key="pulse_"+symbol)
+                    if st.button("DETAILS ↗", key="pulse_open_"+symbol, use_container_width=True):
+                        market_dialog(name, symbol, unit, frame)
+                    if change is not None:
+                        movements.append({"Asset":name, "Daily change (%)":change})
+    st.caption("Yahoo Finance · daily closes, delayed · mini-charts: 1 month · changes versus each asset’s prior close. Metals and oil are futures.")
+    left, right = st.columns([1.3, 1])
+    with left:
+        st.subheader("NEWS ACTIVITY")
+        if items:
+            data = pd.DataFrame(items)
+            data["Hour"] = pd.to_datetime(data["published"], utc=True).dt.floor("h")
+            now_hour = pd.Timestamp.now(tz="UTC").floor("h")
+            hours = pd.date_range((datetime.now(UTC)-timedelta(hours=age)).replace(minute=0,second=0,microsecond=0), now_hour, freq="h")
+            activity = data.groupby("Hour").size().reindex(hours, fill_value=0).rename("Articles").rename_axis("Hour").reset_index()
+            activity["Hour"] = activity["Hour"].dt.tz_convert(LOCAL)
+            fig = px.bar(activity, x="Hour", y="Articles", template="plotly_dark", color_discrete_sequence=["#40e0d0"])
+            fig.update_layout(height=210, margin=dict(l=0,r=0,t=5,b=0), xaxis_title=None, yaxis_title=None)
+            st.plotly_chart(fig, use_container_width=True, key="overview_activity")
+        else:
+            st.info("No articles match the current filters.")
+        st.caption("Retrieved publication timestamps · Malta time · feed limits mean older hours may be incomplete.")
+    with right:
+        st.subheader("DAILY MARKET MOVES")
+        if movements:
+            move_data = pd.DataFrame(movements).sort_values("Daily change (%)")
+            fig = px.bar(move_data, x="Daily change (%)", y="Asset", orientation="h", color="Daily change (%)",
+                         color_continuous_scale=["#fa708e", "#40e0d0"], color_continuous_midpoint=0, template="plotly_dark")
+            fig.update_layout(height=210, margin=dict(l=0,r=0,t=5,b=0), coloraxis_showscale=False, yaxis_title=None)
+            st.plotly_chart(fig, use_container_width=True, key="overview_moves")
+        else:
+            st.info("Market feeds unavailable.")
+    left, right = st.columns([1.3, 1])
+    with left:
+        st.subheader("CHANNEL COVERAGE")
+        if items:
+            counts = pd.Series([a["category"] for a in items]).value_counts().rename_axis("Channel").reset_index(name="Stories")
+            fig = px.bar(counts, x="Stories", y="Channel", orientation="h", template="plotly_dark", color_discrete_sequence=["#40e0d0"])
+            fig.update_layout(height=220, margin=dict(l=0,r=0,t=0,b=0), yaxis_title=None)
+            st.plotly_chart(fig, use_container_width=True, key="overview_coverage")
+        st.caption("Filtered retrieved articles, not global event frequency or severity.")
+    with right:
+        st.subheader("NEXT ELECTIONS")
+        rows, error = elections_calendar()
+        upcoming = [r for r in rows if r["Date"] >= datetime.now(UTC).date().isoformat()]
+        if upcoming:
+            st.dataframe(pd.DataFrame(upcoming[:5]), hide_index=True, use_container_width=True,
+                column_config={"Source":st.column_config.LinkColumn("Source ↗")})
+        else:
+            st.info(error or "No upcoming elections returned by the calendar.")
+        st.caption("Wikidata calendar · dates require source verification. Polls and results remain in the election sections.")
+    st.subheader("LATEST INTELLIGENCE")
+    channels = ["All", "World", "Politics", "Elections", "Conflicts", "Markets", "Sports"]
+    for tab, channel in zip(st.tabs(channels), channels):
+        with tab:
+            selected = items if channel == "All" else [a for a in items if a["category"] == channel]
+            if not selected:
+                st.caption("No matching stories in this window.")
+            for offset in range(0, min(6, len(selected)), 2):
+                for col, item in zip(st.columns(2), selected[offset:offset+2]):
+                    with col, st.container(border=True):
+                        st.markdown(f'<div class="tag">{escape(item["category"].upper())}</div><div class="sport-headline">{escape(item["title"])}</div>', unsafe_allow_html=True)
+                        st.caption(f'{item["source"]} · {timestamp(item["published"])}')
+                        a, b = st.columns(2)
+                        uid = hashlib.sha256(item["url"].encode()).hexdigest()[:16]
+                        if a.button("OPEN BRIEF", key=f"ov_{channel}_{uid}", use_container_width=True):
+                            story_dialog(item)
+                        b.link_button("SOURCE ↗", item["url"], use_container_width=True)
+    with st.expander("FEED HEALTH"):
+        st.write(f"{sum(map(len, FEEDS.values())) - len(errors)} / {sum(map(len, FEEDS.values()))} feeds available on last check")
+        for error in errors:
+            st.caption(error)
+        st.caption("Search and story-window filters apply to news only. Market and calendar panels use their own source dates.")
 
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-10")
-    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Alerts", "Sources"])
+    st.caption("REVISION 2026.10.21-12")
+    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
-    watch = ""
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
     auto = st.toggle("Auto-refresh every 3 minutes", value=True)
     if st.button("REFRESH FEEDS", use_container_width=True):
@@ -729,8 +800,6 @@ def dashboard():
     items = [a for a in all_items if a["published"] and datetime.fromisoformat(a["published"]) >= cutoff]
     if search.strip():
         items = [a for a in items if search.casefold() in (a["title"] + " " + a["summary"]).casefold()]
-    keywords = [s.strip().casefold() for s in watch.split(",") if s.strip()]
-    matches = [a for a in items if any(k in (a["title"] + " " + a["summary"]).casefold() for k in keywords)]
     if section == "Overview":
         with st.container(key="overview_kpis"):
             a, b, c, d = st.columns(4)
@@ -770,7 +839,7 @@ def dashboard():
             st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True, column_config={"Source": st.column_config.LinkColumn("Calendar source")})
         else:
             st.info("No dated elections returned by the calendar source.")
-        polling_panel()
+        st.caption("Poll charts appear only when verified original-source data is connected. No worldwide polling feed is currently connected.")
         st.subheader("ELECTION REPORTING")
         stories([a for a in items if a["category"] == "Elections"], "elections", 12)
     elif section == "Sources":
@@ -781,34 +850,10 @@ def dashboard():
                 st.link_button("OPEN FEED ↗", url)
         for error in errors:
             st.warning(error)
-        st.write("Markets: Yahoo Finance via yfinance; 10-minute cache; daily observations. Election calendar: Wikidata; 6-hour cache. Polling: sourced CSV uploads.")
+        st.write("Markets: Yahoo Finance via yfinance; 10-minute cache; daily observations. Election calendar: Wikidata; 6-hour cache. Polling: original-source datasets only; none connected.")
         st.caption("Google News election links may open its publisher redirect. Conflict channels include regional reporting and do not independently confirm military events. Undated articles are excluded from time-filtered feeds.")
-    elif section == "Alerts":
-        st.subheader("KEYWORD ALERTS")
-        alert_terms = st.text_input("Your keywords (optional)", value="", placeholder="Enter keywords separated by commas", key="private_alert_terms")
-        alert_keywords = [term.strip().casefold() for term in alert_terms.split(",") if term.strip()]
-        alert_matches = [item for item in items if any(term in (item["title"] + " " + item["summary"]).casefold() for term in alert_keywords)]
-        st.caption("Keywords apply only to this session. Matches cover fetched headlines and excerpts while this page is open; phone notifications are not connected.")
-        if alert_keywords:
-            stories(alert_matches, "alerts")
-        else:
-            st.info("Add keywords above to create your own session watchlist.")
     elif section == "Overview":
-        left, right = st.columns([2, 1])
-        with left:
-            st.subheader("LATEST DISPATCHES")
-            stories(items, "overview", 15)
-        with right:
-            if keywords:
-                st.subheader("WATCHLIST SIGNALS")
-                stories(matches, "watch", 5)
-            st.subheader("COVERAGE")
-            if items:
-                counts = pd.Series([a["category"] for a in items]).value_counts().rename_axis("Channel").reset_index(name="Stories")
-                fig = px.bar(counts, x="Stories", y="Channel", orientation="h", template="plotly_dark", color_discrete_sequence=["#40e0d0"])
-                fig.update_layout(height=250, margin=dict(l=0, r=0, t=5, b=0))
-                st.plotly_chart(fig, use_container_width=True)
-            st.caption("Counts describe retrieved articles, not global event frequency.")
+        overview_panel(items, errors)
     else:
         st.subheader(section.upper() + " / DISPATCHES")
         if section == "Conflicts":
