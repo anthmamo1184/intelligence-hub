@@ -80,6 +80,38 @@ FEEDS = {
     "Conflicts": [("BBC Middle East", "https://feeds.bbci.co.uk/news/world/middle_east/rss.xml"), ("BBC Europe", "https://feeds.bbci.co.uk/news/world/europe/rss.xml")],
     "Elections": [("Google News · elections", "https://news.google.com/rss/search?" + urlencode({"q": "election polls voting when:7d", "hl": "en-GB", "gl": "GB", "ceid": "GB:en"}))],
 }
+
+def publisher_search_feed(domain, terms=""):
+    return "https://news.google.com/rss/search?"+urlencode({"q":f"site:{domain} ({terms}) when:7d" if terms else f"site:{domain} when:7d","hl":"en-GB","gl":"GB","ceid":"GB:en"})
+
+
+# Fox publishes section RSS. CNN/Reuters headlines are indexed by Google News;
+# these are not represented as direct publisher RSS or licensed article feeds.
+FEEDS["World"] += [
+    ("Fox News · World", "https://moxie.foxnews.com/google-publisher/world.xml"),
+    ("CNN · via Google News", publisher_search_feed("cnn.com", "world")),
+    ("Reuters · via Google News", publisher_search_feed("reuters.com", "world")),
+]
+FEEDS["Politics"] += [
+    ("Fox News · Politics", "https://moxie.foxnews.com/google-publisher/politics.xml"),
+    ("CNN · Politics via Google News", publisher_search_feed("cnn.com", "politics OR government OR congress")),
+    ("Reuters · Politics via Google News", publisher_search_feed("reuters.com", "politics OR government OR congress")),
+]
+FEEDS["Markets"] += [
+    ("CNN · Markets via Google News", publisher_search_feed("cnn.com", "business OR markets OR economy")),
+    ("Reuters · Markets via Google News", publisher_search_feed("reuters.com", "business OR markets OR economy")),
+]
+FEEDS["Conflicts"] += [
+    ("CNN · Conflicts via Google News", publisher_search_feed("cnn.com", "war OR ceasefire OR military")),
+    ("Reuters · Conflicts via Google News", publisher_search_feed("reuters.com", "war OR ceasefire OR military")),
+    ("Fox News · Conflicts via Google News", publisher_search_feed("foxnews.com", "war OR ceasefire OR military")),
+]
+FEEDS["Elections"] += [
+    ("CNN · Elections via Google News", publisher_search_feed("cnn.com", "election OR voting")),
+    ("Reuters · Elections via Google News", publisher_search_feed("reuters.com", "election OR voting")),
+    ("Fox News · Elections via Google News", publisher_search_feed("foxnews.com", "election OR voting")),
+]
+
 ASSETS = {
     "Gold": ("GC=F", "USD / troy oz"), "Silver": ("SI=F", "USD / troy oz"),
     "Brent oil": ("BZ=F", "USD / barrel"), "WTI oil": ("CL=F", "USD / barrel"),
@@ -160,7 +192,7 @@ def news_data():
         if error:
             errors.append(error)
         for row in rows:
-            key = re.sub(r"\W", "", row["title"]).lower()
+            key = (row["category"], row["source"], re.sub(r"\W", "", row["title"]).lower())
             if key not in seen:
                 seen.add(key)
                 articles.append(row)
@@ -238,7 +270,7 @@ def short_preview(text, words=280):
 @st.cache_data(ttl=1800, show_spinner=False)
 def article_preview(url):
     # Only known public publishers; never follow redirects to another host.
-    allowed = {"www.bbc.co.uk", "bbc.co.uk", "www.bbc.com", "bbc.com", "www.aljazeera.com", "aljazeera.com"}
+    allowed = {"www.bbc.co.uk", "bbc.co.uk", "www.bbc.com", "bbc.com", "www.aljazeera.com", "aljazeera.com", "www.foxnews.com", "foxnews.com", "www.cnn.com", "cnn.com", "edition.cnn.com", "www.reuters.com", "reuters.com"}
     try:
         for _ in range(3):
             if urlparse(url).scheme != "https" or urlparse(url).hostname not in allowed:
@@ -1043,7 +1075,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-17")
+    st.caption("REVISION 2026.10.21-18")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
@@ -1118,6 +1150,7 @@ def dashboard():
                 st.link_button("OPEN FEED ↗", url)
         for error in errors:
             st.warning(error)
+        st.caption("Fox News section feeds are direct RSS. CNN/Reuters and topic-specific publisher feeds use Google News indexing, not a licensed publisher newswire. Publisher links can redirect; full previews may be limited.")
         st.write("Markets: Yahoo Finance via yfinance; 10-minute cache; daily observations. Election calendar: Wikidata; 6-hour cache. Polling: original-source datasets only; none connected.")
         st.caption("Google News election links may open its publisher redirect. Conflict channels include regional reporting and do not independently confirm military events. Undated articles are excluded from time-filtered feeds.")
     elif section == "Overview":
