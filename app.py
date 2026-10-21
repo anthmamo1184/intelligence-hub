@@ -15,6 +15,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 import streamlit as st
+import folium
+import pycountry
+from shapely.geometry import shape, Point
+from streamlit_folium import st_folium
 import yfinance as yf
 import trafilatura
 
@@ -53,6 +57,10 @@ h3{font-size:1rem!important;}
 [class*="st-key-desk_kpis_"] [data-testid="stMetric"]{padding:5px 8px!important;}
 [class*="st-key-desk_kpis_"] [data-testid="stMetricValue"]{font-size:1.1rem!important;}
 .desk-excerpt{font-size:.78rem;line-height:1.5;color:#9db4c7;margin:.25rem 0 .65rem;}
+.pulse-name{font-family:Oxanium,monospace;font-size:.7rem;color:#9ebdca;}
+.pulse-price{font-family:"Share Tech Mono",monospace;font-size:1.05rem;color:#e1edf7;white-space:nowrap;}
+.st-key-overview_pulse [data-testid="stVerticalBlock"]{gap:.1rem;}
+.st-key-overview_pulse [data-testid="stCaptionContainer"] p{font-size:.62rem;}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -678,7 +686,8 @@ def elections_calendar():
         return [], "Election calendar feed is unavailable. Election reporting below remains available."
 
 
-def news_desk(items, channel):
+def news_desk(items, channel, scope=None):
+    scope = scope or channel
     st.subheader(channel.upper() + " / NEWS DESK")
     rows = [item for item in items if item["category"] == channel]
     topics = {
@@ -686,20 +695,20 @@ def news_desk(items, channel):
         "Politics": {"Elections":r"elect|vot|ballot|poll", "Government":r"government|minister|president|parliament|congress", "Policy":r"policy|reform|legislat|budget|tax", "Diplomacy":r"diploma|summit|treaty|sanction"},
         "Conflicts": {"Military":r"militar|troop|missile|drone|strike|attack", "Diplomacy":r"ceasefire|peace|talks|diploma|negotiat", "Humanitarian":r"humanitarian|refugee|displaced|civilian|aid", "Security":r"security|border|police|terror"}
     }[channel]
-    selected = st.radio("TOPIC", ["All"]+list(topics), horizontal=True, key="desk_topic_"+channel, label_visibility="collapsed")
+    selected = st.radio("TOPIC", ["All"]+list(topics), horizontal=True, key="desk_topic_"+scope, label_visibility="collapsed")
     controls, options = st.columns([3,1])
     sources = sorted({r["source"] for r in rows})
     with controls.popover("SOURCES / FILTER", use_container_width=True):
-        selected_sources = st.multiselect("Publishers", sources, default=sources, key="desk_sources_"+channel)
+        selected_sources = st.multiselect("Publishers", sources, default=sources, key="desk_sources_"+scope)
         st.caption("Topic filters match words in headlines and feed summaries; categories can overlap.")
-    limit = options.selectbox("Stories shown",[12,24,48],index=1,key="desk_limit_"+channel,label_visibility="collapsed")
+    limit = options.selectbox("Stories shown",[12,24,48],index=1,key="desk_limit_"+scope,label_visibility="collapsed")
     rows = [r for r in rows if r["source"] in selected_sources]
     if selected != "All":
         rows = [r for r in rows if re.search(topics[selected], r["title"]+" "+r["summary"], re.I)]
     rows.sort(key=lambda r:r["published"] or "",reverse=True)
     now = datetime.now(UTC)
     recent = sum(datetime.fromisoformat(r["published"]) >= now-timedelta(hours=6) for r in rows)
-    with st.container(key="desk_kpis_"+channel):
+    with st.container(key="desk_kpis_"+scope):
         cols=st.columns(4)
         cols[0].metric("ARTICLES",len(rows))
         cols[1].metric("PUBLISHERS",len({r["source"] for r in rows}))
@@ -718,11 +727,11 @@ def news_desk(items, channel):
         activity["Hour"]=activity["Hour"].dt.tz_convert(LOCAL)
         fig=px.bar(activity,x="Hour",y="Articles",template="plotly_dark",color_discrete_sequence=["#40e0d0"])
         fig.update_layout(height=170,margin=dict(l=0,r=0,t=5,b=0),xaxis_title=None,yaxis_title=None)
-        left.plotly_chart(fig,use_container_width=True,key="desk_activity_"+channel)
+        left.plotly_chart(fig,use_container_width=True,key="desk_activity_"+scope)
         counts=data["source"].value_counts().rename_axis("Publisher").reset_index(name="Articles")
         fig=px.bar(counts,x="Articles",y="Publisher",orientation="h",template="plotly_dark",color_discrete_sequence=["#40e0d0"])
         fig.update_layout(height=170,margin=dict(l=0,r=0,t=5,b=0),yaxis_title=None)
-        right.plotly_chart(fig,use_container_width=True,key="desk_sources_chart_"+channel)
+        right.plotly_chart(fig,use_container_width=True,key="desk_sources_chart_"+scope)
         st.caption("Counts cover filtered retrieved articles, not all reporting or confirmed events. Feed limits can leave older hours incomplete.")
     st.caption(f"{len(rows)} matching articles · showing {min(limit,len(rows))} · latest {latest}")
     if channel == "Conflicts":
@@ -736,87 +745,218 @@ def news_desk(items, channel):
                     st.markdown(f'<div class="desk-excerpt">{escape(short_preview(item["summary"],42))}</div>',unsafe_allow_html=True)
                 left,right=st.columns(2)
                 uid=hashlib.sha256(item["url"].encode()).hexdigest()[:16]
-                if left.button("BRIEF",key=f"desk_{channel}_{uid}",use_container_width=True):
+                if left.button("BRIEF",key=f"desk_{scope}_{uid}",use_container_width=True):
                     story_dialog(item)
                 right.link_button("SOURCE ↗",item["url"],use_container_width=True)
 
 
+COUNTRY_ALIASES = {
+    "USA":["United States", "U.S.", "US", "American"], "GBR":["United Kingdom", "UK", "Britain", "British"],
+    "RUS":["Russia", "Russian"], "UKR":["Ukraine", "Ukrainian"], "ISR":["Israel", "Israeli"],
+    "PSE":["Palestine", "Palestinian", "Gaza", "West Bank"], "IRN":["Iran", "Iranian"],
+    "CHN":["China", "Chinese"], "PRK":["North Korea"], "KOR":["South Korea"],
+    "SYR":["Syria", "Syrian"], "SDN":["Sudan", "Sudanese"], "SSD":["South Sudan"],
+    "MMR":["Myanmar", "Burma", "Burmese"], "COD":["DR Congo", "DRC", "Democratic Republic of the Congo"],
+    "COG":["Republic of the Congo", "Congo-Brazzaville"], "LBN":["Lebanon", "Lebanese"],
+    "YEM":["Yemen", "Yemeni"], "BRA":["Brazil", "Brazilian"], "MLT":["Malta", "Maltese"],
+    "TUR":["Turkey", "Türkiye", "Turkish"], "CZE":["Czechia", "Czech Republic"],
+    "CIV":["Ivory Coast", "Côte d’Ivoire", "Côte d'Ivoire"], "TWN":["Taiwan", "Taiwanese"],
+}
+CONFLICT_WORDS = r"\b(war|conflict|fighting|troops?|military|missiles?|airstrikes?|ceasefire|armed|bombing|drone attack|invasion)\b"
+ELECTION_WORDS = r"\b(elections?|ballots?|voting|voters?|polling|runoff|run-off)\b"
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def country_catalog():
+    return {c.alpha_3: {"name": c.name, "aliases": COUNTRY_ALIASES.get(c.alpha_3, list(dict.fromkeys([c.name, getattr(c,"common_name",c.name),getattr(c,"official_name",c.name)])))} for c in pycountry.countries}
+
+
+def country_mentions(text, catalog):
+    found=[]
+    for code, country in catalog.items():
+        if any(re.search(r"(?<!\w)"+re.escape(alias)+r"(?!\w)",text,re.I if alias != "US" else 0) for alias in country["aliases"]):
+            found.append(code)
+    # Do not count a South Sudan mention as Sudan unless Sudan occurs separately.
+    if "SSD" in found and not re.search(r"(?<!South )\bSudan\b",text,re.I):
+        found=[c for c in found if c != "SDN"]
+    return found
+
+
+@st.cache_data(ttl=86400,show_spinner=False)
+def world_geometry():
+    try:
+        r=requests.get("https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json",timeout=12,headers=HEADERS)
+        r.raise_for_status()
+        data=r.json()
+        if data.get("type") != "FeatureCollection":
+            return None
+        return data
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=180,show_spinner=False)
+def country_news(code, layer, hours):
+    country=country_catalog()[code]
+    aliases=country["aliases"][:2]
+    country_query="("+" OR ".join('"'+a+'"' for a in aliases)+")"
+    topic={"All":"", "Conflicts":" (war OR conflict OR ceasefire OR military OR humanitarian)", "Elections":" (election OR voting OR ballot OR polling)"}[layer]
+    query=country_query+topic+f" when:{hours}h"
+    url="https://news.google.com/rss/search?"+urlencode({"q":query,"hl":"en-GB","gl":"GB","ceid":"GB:en"})
+    return fetch_feed("World", "Google News · "+country["name"], url)
+
+
+def open_country(code):
+    st.session_state.monitor_country=code
+    st.session_state.monitor_country_layer=st.session_state.get("world_layer","All")
+    st.rerun()
+
+
+def country_monitor(code):
+    catalog=country_catalog()
+    if code not in catalog:
+        st.session_state.pop("monitor_country",None)
+        st.rerun()
+    if st.button("← BACK TO WORLD MONITOR",key="back_monitor"):
+        st.session_state.pop("monitor_country",None)
+        st.rerun()
+    st.subheader(catalog[code]["name"].upper()+" / COUNTRY BRIEFING")
+    layer=st.radio("COUNTRY COVERAGE",["All","Conflicts","Elections"],index=["All","Conflicts","Elections"].index(st.session_state.get("monitor_country_layer","All")),horizontal=True,key="country_layer_"+code)
+    with st.spinner("Loading country reporting…"):
+        rows,error=country_news(code,layer,age)
+    cutoff=datetime.now(UTC)-timedelta(hours=age)
+    rows=[r for r in rows if r["published"] and datetime.fromisoformat(r["published"])>=cutoff]
+    if search.strip():
+        rows=[r for r in rows if search.casefold() in (r["title"]+" "+r["summary"]).casefold()]
+    if error:
+        st.warning(error)
+    st.caption("English-language reporting about this country · Google News publisher links · not necessarily local publications")
+    st.caption("Checked "+datetime.now(LOCAL).strftime("%d %b %H:%M Malta")+" · cached up to 3 minutes")
+    # Reuse compact news-desk rendering without a second category exclusion.
+    category="Conflicts" if layer=="Conflicts" else "Politics" if layer=="Elections" else "World"
+    news_desk([dict(r,category=category) for r in rows],category,scope="country_"+code+"_"+layer)
+    if layer == "Elections":
+        st.caption("Reporting is separate from official polling/results. No verified polling dataset is currently connected.")
+
+
+def world_monitor(items):
+    st.subheader("WORLD MONITOR")
+    controls,selector=st.columns([1.2,1])
+    layer=controls.radio("MAP LAYER",["All","Conflicts","Elections"],horizontal=True,key="world_layer",label_visibility="collapsed")
+    catalog=country_catalog()
+    ordered=sorted(catalog,key=lambda code:catalog[code]["name"])
+    with selector:
+        selection=st.selectbox("Find a country",[None]+ordered,format_func=lambda code: "Search / select any country…" if code is None else catalog[code]["name"],key="country_picker",label_visibility="collapsed")
+        if selection and st.button("OPEN COUNTRY ↗",key="open_picked_country",use_container_width=True):
+            open_country(selection)
+    counts={}
+    for item in items:
+        text=item["title"]+" "+item["summary"]
+        if layer=="Conflicts" and not re.search(CONFLICT_WORDS,text,re.I):
+            continue
+        if layer=="Elections" and not re.search(ELECTION_WORDS,text,re.I):
+            continue
+        for code in country_mentions(text,catalog):
+            counts[code]=counts.get(code,0)+1
+    calendar_rows,calendar_error=elections_calendar() if layer in ["All","Elections"] else ([],None)
+    elections={}
+    today=datetime.now(UTC).date().isoformat()
+    for row in calendar_rows:
+        if row["Date"]<today:
+            continue
+        codes=country_mentions(row["Country"],catalog)
+        for code in codes:
+            elections.setdefault(code,[]).append(row)
+    data=world_geometry()
+    if data:
+        color="#eeaa55" if layer=="Conflicts" else "#a995ff" if layer=="Elections" else "#40e0d0"
+        m=folium.Map(location=[22,10],zoom_start=2,min_zoom=2,max_zoom=7,tiles=None,control_scale=True,prefer_canvas=True)
+        m.get_root().header.add_child(folium.Element("<style>.leaflet-container{background:#070d17!important}.leaflet-tooltip{background:#101c2c;color:#dce9f5;border:1px solid #426275;font:12px monospace}</style>"))
+        for latitude in range(-60,90,30):
+            folium.PolyLine([[latitude,-180],[latitude,180]],color="#183040",weight=.5,opacity=.6,interactive=False).add_to(m)
+        for longitude in range(-180,181,30):
+            folium.PolyLine([[-80,longitude],[85,longitude]],color="#183040",weight=.5,opacity=.6,interactive=False).add_to(m)
+        features=[]
+        for original in data["features"]:
+            f=dict(original)
+            props=dict(f["properties"])
+            code=f.get("id", "")
+            # The boundary source uses three-letter country codes.
+            props["code"]=code
+            props["Country"]=catalog.get(code,{}).get("name",props.get("name","Unknown"))
+            props["Articles"]=counts.get(code,0)
+            props["Calendar elections"]=len(elections.get(code,[]))
+            props["highlight"]=bool(props["Articles"] or props["Calendar elections"])
+            f["properties"]=props
+            features.append(f)
+        boundaries={"type":"FeatureCollection","features":features}
+        folium.GeoJson(boundaries,name="Countries",style_function=lambda f:{"fillColor":color if f["properties"]["highlight"] else "#102537","color":"#426275","weight":.6,"fillOpacity":.50 if f["properties"]["highlight"] else .13},highlight_function=lambda f:{"weight":2,"color":"#8cffff","fillOpacity":.7},tooltip=folium.GeoJsonTooltip(fields=["Country","Articles","Calendar elections"],aliases=["Country","Retrieved articles","Upcoming calendar entries"],sticky=False),embed=True).add_to(m)
+        result=st_folium(m,height=410,use_container_width=True,key="world_map_"+layer,returned_objects=["last_clicked"])
+        click=result.get("last_clicked") if result else None
+        fingerprint=(layer,click.get("lat"),click.get("lng")) if click else None
+        if click and fingerprint != st.session_state.get("monitor_last_click"):
+            st.session_state.monitor_last_click=fingerprint
+            point=Point(((click["lng"]+180)%360)-180,click["lat"])
+            for f in features:
+                code=f["properties"]["code"]
+                if code in catalog and shape(f["geometry"]).covers(point):
+                    open_country(code)
+                    break
+    else:
+        st.info("Map boundaries are unavailable. Select a country above to open its briefing.")
+    st.caption("Click a country or use search. Highlighting means country mentions in retrieved reports"+(" or upcoming calendar entries." if layer in ["All","Elections"] else "."))
+    st.caption("Conflicts uses keyword-matched reporting, not verified war-zone boundaries. Mentions can concern several countries. No highlight does not imply no conflict or election.")
+    if calendar_error:
+        st.caption("Election calendar unavailable on this check; election news remains available.")
+    if counts:
+        st.caption("COUNTRIES IN RETRIEVED COVERAGE")
+        leading=sorted(counts,key=counts.get,reverse=True)[:6]
+        for col,code in zip(st.columns(3),leading[:3]):
+            if col.button(f'{catalog[code]["name"]} · {counts[code]}',key="country_shortcut_"+code,use_container_width=True):
+                open_country(code)
+    with st.expander("ELECTION DATES / SOURCES",expanded=False):
+        upcoming=[dict(r) for r in calendar_rows if r["Date"]>=today]
+        if upcoming:
+            st.dataframe(pd.DataFrame(upcoming[:12]),hide_index=True,use_container_width=True,column_config={"Source":st.column_config.LinkColumn("Source ↗")})
+        else:
+            st.caption("No upcoming calendar entries available on this check.")
+        st.caption("Wikidata community-maintained calendar · six-hour cache · verify dates at election authorities. Polls/results require original verified sources. Map boundaries: world.geo.json / Natural Earth; boundaries are illustrative.")
+
+
 def overview_panel(items, errors):
+    if st.session_state.get("monitor_country"):
+        country_monitor(st.session_state.monitor_country)
+        return
     st.subheader("MARKET PULSE")
     basket = {name: ASSETS[name] if name in ASSETS else MARKET_PRESETS[name]
               for name in ["S&P 500", "Nasdaq", "Gold", "Silver", "Brent oil", "EUR / USD"]}
     with ThreadPoolExecutor(max_workers=4) as pool:
         frames = list(pool.map(lambda name: market_data(basket[name][0]), basket))
-    movements = []
     with st.container(key="overview_pulse"):
-        for offset in range(0, len(basket), 3):
-            for col, name, frame in zip(st.columns(3), list(basket)[offset:offset+3], frames[offset:offset+3]):
-                symbol, unit = basket[name]
-                with col, st.container(border=True):
-                    if frame is None or frame.empty:
-                        st.metric(name, "Unavailable")
-                        continue
-                    close = float(frame["Close"].iloc[-1])
-                    previous = float(frame["Close"].iloc[-2]) if len(frame) > 1 else None
-                    change = (close / previous - 1) * 100 if previous else None
-                    st.metric(name, f"{close:,.4f}" if " / " in name else f"{close:,.2f}",
-                              f"{change:+.2f}%" if change is not None else None)
-                    st.caption(f'{unit} · {frame["Date"].iloc[-1]:%d %b %Y}')
-                    view = chart_window(frame, "1M")
-                    if not view.empty:
-                        fig = price_figure(view, unit, compact=True)
-                        fig.update_layout(height=105, margin=dict(l=0, r=0, t=0, b=0))
-                        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar":False}, key="pulse_"+symbol)
-                    if st.button("DETAILS ↗", key="pulse_open_"+symbol, use_container_width=True):
-                        market_dialog(name, symbol, unit, frame)
-                    if change is not None:
-                        movements.append({"Asset":name, "Daily change (%)":change})
-    st.caption("Yahoo Finance · daily closes, delayed · mini-charts: 1 month · changes versus each asset’s prior close. Metals and oil are futures.")
-    left, right = st.columns([1.3, 1])
-    with left:
-        st.subheader("NEWS ACTIVITY")
-        if items:
-            data = pd.DataFrame(items)
-            data["Hour"] = pd.to_datetime(data["published"], utc=True).dt.floor("h")
-            now_hour = pd.Timestamp.now(tz="UTC").floor("h")
-            hours = pd.date_range((datetime.now(UTC)-timedelta(hours=age)).replace(minute=0,second=0,microsecond=0), now_hour, freq="h")
-            activity = data.groupby("Hour").size().reindex(hours, fill_value=0).rename("Articles").rename_axis("Hour").reset_index()
-            activity["Hour"] = activity["Hour"].dt.tz_convert(LOCAL)
-            fig = px.bar(activity, x="Hour", y="Articles", template="plotly_dark", color_discrete_sequence=["#40e0d0"])
-            fig.update_layout(height=210, margin=dict(l=0,r=0,t=5,b=0), xaxis_title=None, yaxis_title=None)
-            st.plotly_chart(fig, use_container_width=True, key="overview_activity")
-        else:
-            st.info("No articles match the current filters.")
-        st.caption("Retrieved publication timestamps · Malta time · feed limits mean older hours may be incomplete.")
-    with right:
-        st.subheader("DAILY MARKET MOVES")
-        if movements:
-            move_data = pd.DataFrame(movements).sort_values("Daily change (%)")
-            fig = px.bar(move_data, x="Daily change (%)", y="Asset", orientation="h", color="Daily change (%)",
-                         color_continuous_scale=["#fa708e", "#40e0d0"], color_continuous_midpoint=0, template="plotly_dark")
-            fig.update_layout(height=210, margin=dict(l=0,r=0,t=5,b=0), coloraxis_showscale=False, yaxis_title=None)
-            st.plotly_chart(fig, use_container_width=True, key="overview_moves")
-        else:
-            st.info("Market feeds unavailable.")
-    left, right = st.columns([1.3, 1])
-    with left:
-        st.subheader("CHANNEL COVERAGE")
-        if items:
-            counts = pd.Series([a["category"] for a in items]).value_counts().rename_axis("Channel").reset_index(name="Stories")
-            fig = px.bar(counts, x="Stories", y="Channel", orientation="h", template="plotly_dark", color_discrete_sequence=["#40e0d0"])
-            fig.update_layout(height=220, margin=dict(l=0,r=0,t=0,b=0), yaxis_title=None)
-            st.plotly_chart(fig, use_container_width=True, key="overview_coverage")
-        st.caption("Filtered retrieved articles, not global event frequency or severity.")
-    with right:
-        st.subheader("NEXT ELECTIONS")
-        rows, error = elections_calendar()
-        upcoming = [r for r in rows if r["Date"] >= datetime.now(UTC).date().isoformat()]
-        if upcoming:
-            st.dataframe(pd.DataFrame(upcoming[:5]), hide_index=True, use_container_width=True,
-                column_config={"Source":st.column_config.LinkColumn("Source ↗")})
-        else:
-            st.info(error or "No upcoming elections returned by the calendar.")
-        st.caption("Wikidata calendar · dates require source verification. Polls and results remain in the election sections.")
+        for col, (name, (symbol, unit)), frame in zip(st.columns(6), basket.items(), frames):
+            with col, st.container(border=True):
+                st.markdown(f'<div class="pulse-name">{escape(name)}</div>', unsafe_allow_html=True)
+                if frame is None or frame.empty:
+                    st.caption("Unavailable")
+                    continue
+                close = float(frame["Close"].iloc[-1])
+                prior = float(frame["Close"].iloc[-2]) if len(frame)>1 else None
+                change = (close/prior-1)*100 if prior else None
+                st.markdown(f'<div class="pulse-price">{close:,.4f}</div>' if name == "EUR / USD" else f'<div class="pulse-price">{close:,.2f}</div>', unsafe_allow_html=True)
+                st.caption((f"{change:+.2f}%" if change is not None else "—") + " · " + unit)
+                view = chart_window(frame, "1M")
+                if not view.empty:
+                    color = "#40e0d0" if float(view["Close"].iloc[-1]) >= float(view["Close"].iloc[0]) else "#ff6b86"
+                    fig=go.Figure(go.Scatter(x=view["Date"],y=view["Close"],mode="lines",line=dict(color=color,width=1.5),fill="tozeroy",fillcolor="rgba(64,224,208,.04)",hovertemplate="%{x|%d %b}<br>%{y:,.2f} "+unit+"<extra></extra>"))
+                    low,high=float(view["Close"].min()),float(view["Close"].max())
+                    pad=max((high-low)*.15,abs(high)*.002,.001)
+                    fig.update_layout(height=50,margin=dict(l=0,r=0,t=0,b=0),paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",xaxis=dict(visible=False,fixedrange=True),yaxis=dict(visible=False,range=[low-pad,high+pad],fixedrange=True),showlegend=False)
+                    st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False},key="pulse_"+symbol)
+                st.caption(f'{frame["Date"].iloc[-1]:%d %b}')
+                if st.button("↗",key="pulse_open_"+symbol,help="Open full chart",use_container_width=True):
+                    market_dialog(name,symbol,unit,frame)
+    st.caption("Daily quotes · Yahoo Finance · delayed · 1M sparklines · metals/oil: futures")
+    world_monitor(items)
     st.subheader("LATEST INTELLIGENCE")
     channels = ["All", "World", "Politics", "Elections", "Conflicts", "Markets", "Sports"]
     for tab, channel in zip(st.tabs(channels), channels):
@@ -843,7 +983,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-14")
+    st.caption("REVISION 2026.10.21-15")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
