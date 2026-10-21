@@ -45,6 +45,8 @@ h3{font-size:1rem!important;}
 .st-key-overview_kpis [data-testid="stMetric"]{padding:6px 10px!important;min-height:0!important;}
 .st-key-overview_kpis [data-testid="stMetricLabel"] p{font-size:.65rem!important;letter-spacing:.5px;}
 .st-key-overview_kpis [data-testid="stMetricValue"]{font-size:1.05rem!important;}
+.st-key-commodity_controls [data-testid="stVerticalBlock"]{gap:.25rem!important;}
+.st-key-commodity_controls{margin-bottom:.15rem;}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -444,9 +446,11 @@ def convert_commodity(frame, unit, currency="USD", metal_weight="Troy oz", fx=No
     return out, unit
 
 
-def market_panel(names, assets=None, compact_controls=False, commodity_currency=None, metal_weight="Troy oz"):
+def market_panel(names, assets=None, compact_controls=False, commodity_currency=None, metal_weight="Troy oz", selected_period=None):
     assets = ASSETS if assets is None else assets
-    if compact_controls:
+    if selected_period is not None:
+        period = selected_period
+    elif compact_controls:
         period = st.radio("Chart range", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, label_visibility="collapsed", key="market_range_"+section)
     else:
         st.caption("Yahoo Finance · latest daily observations · prices may be delayed · cached 10 minutes")
@@ -457,8 +461,7 @@ def market_panel(names, assets=None, compact_controls=False, commodity_currency=
     fx = market_data("EURUSD=X") if commodity_currency == "EUR" else None
     if commodity_currency == "EUR" and (fx is None or fx.empty):
         st.warning("EUR conversion unavailable: exchange-rate feed could not be loaded. Select USD to view source prices.")
-    if commodity_currency == "EUR":
-        st.caption("EUR charts use historical daily EUR/USD rates; converted candles are estimates. Missing exchange-rate observations are omitted.")
+
     # Build actual rows so each asset keeps its position as cards change height.
     for offset in range(0, len(names), 3):
         cols = st.columns(3)
@@ -700,7 +703,7 @@ def polling_panel():
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-09")
+    st.caption("REVISION 2026.10.21-10")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Alerts", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     watch = ""
@@ -740,15 +743,19 @@ def dashboard():
         markets_page()
     elif section == "Commodities":
         st.subheader("COMMODITIES")
-        st.caption("Commodity quotes are futures, not spot prices.")
-        money, weight = st.columns(2)
-        currency = money.radio("Currency", ["USD", "EUR"], horizontal=True, key="commodity_currency")
-        metal_weight = weight.radio("Precious-metal weight", ["Troy oz", "Grams"], horizontal=True, key="metal_weight")
-        st.caption("Weight selector applies to gold, silver, platinum and palladium. Oil stays per barrel, gas per MMBtu, and other commodities retain their trading units. Agricultural cents are converted to dollars/euros.")
-        choices = st.multiselect("Watchlist", list(ASSETS)[:11], default=list(ASSETS)[:6])
-        market_panel(choices, commodity_currency=currency, metal_weight=metal_weight)
-        if currency == "EUR":
-            st.link_button("EUR/USD EXCHANGE-RATE SOURCE ↗", "https://finance.yahoo.com/quote/EURUSD%3DX/")
+        with st.container(key="commodity_controls"):
+            money, weight, timeframe, assets_control = st.columns([1, 1.25, 2, 1])
+            currency = money.selectbox("Currency", ["USD", "EUR"], label_visibility="collapsed", key="commodity_currency", help="Display currency")
+            metal_weight = weight.selectbox("Precious-metal weight", ["Troy oz", "Grams"], label_visibility="collapsed", key="metal_weight", help="Weight unit for precious metals")
+            period = timeframe.radio("Commodity chart range", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, label_visibility="collapsed", key="compact_commodity_period")
+            with assets_control.popover("ASSETS", use_container_width=True):
+                choices = st.multiselect("Choose commodities", list(ASSETS)[:11], default=list(ASSETS)[:6], key="commodity_asset_selection")
+        market_panel(choices, commodity_currency=currency, metal_weight=metal_weight, selected_period=period)
+        with st.expander("Source & units", expanded=False):
+            st.caption("Yahoo Finance futures, not spot or dealer prices. Prices may be delayed. Weight applies to precious metals; other commodities keep their trading units.")
+            if currency == "EUR":
+                st.caption("EUR uses historical daily EUR/USD closes. Converted candles are estimates; unmatched exchange-rate observations are omitted.")
+                st.link_button("EUR/USD SOURCE ↗", "https://finance.yahoo.com/quote/EURUSD%3DX/")
     elif section == "Sports":
         sports_panel()
     elif section == "US Elections":
