@@ -50,6 +50,9 @@ h3{font-size:1rem!important;}
 .st-key-commodity_controls{margin-bottom:.15rem;}
 .st-key-overview_pulse [data-testid="stMetric"]{padding:4px 8px!important;border:0;background:transparent;}
 .st-key-overview_pulse [data-testid="stMetricValue"]{font-size:1.2rem!important;}
+[class*="st-key-desk_kpis_"] [data-testid="stMetric"]{padding:5px 8px!important;}
+[class*="st-key-desk_kpis_"] [data-testid="stMetricValue"]{font-size:1.1rem!important;}
+.desk-excerpt{font-size:.78rem;line-height:1.5;color:#9db4c7;margin:.25rem 0 .65rem;}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -673,6 +676,69 @@ def elections_calendar():
         return [], "Election calendar feed is unavailable. Election reporting below remains available."
 
 
+def news_desk(items, channel):
+    st.subheader(channel.upper() + " / NEWS DESK")
+    rows = [item for item in items if item["category"] == channel]
+    topics = {
+        "World": {"Diplomacy":r"diploma|summit|treaty|sanction|ambassador", "Economy":r"econom|inflation|trade|bank|budget", "Climate":r"climate|flood|storm|wildfire|earthquake", "Security":r"militar|attack|war|missile|defen[cs]|police"},
+        "Politics": {"Elections":r"elect|vot|ballot|poll", "Government":r"government|minister|president|parliament|congress", "Policy":r"policy|reform|legislat|budget|tax", "Diplomacy":r"diploma|summit|treaty|sanction"},
+        "Conflicts": {"Military":r"militar|troop|missile|drone|strike|attack", "Diplomacy":r"ceasefire|peace|talks|diploma|negotiat", "Humanitarian":r"humanitarian|refugee|displaced|civilian|aid", "Security":r"security|border|police|terror"}
+    }[channel]
+    selected = st.radio("TOPIC", ["All"]+list(topics), horizontal=True, key="desk_topic_"+channel, label_visibility="collapsed")
+    controls, options = st.columns([3,1])
+    sources = sorted({r["source"] for r in rows})
+    with controls.popover("SOURCES / FILTER", use_container_width=True):
+        selected_sources = st.multiselect("Publishers", sources, default=sources, key="desk_sources_"+channel)
+        st.caption("Topic filters match words in headlines and feed summaries; categories can overlap.")
+    limit = options.selectbox("Stories shown",[12,24,48],index=1,key="desk_limit_"+channel,label_visibility="collapsed")
+    rows = [r for r in rows if r["source"] in selected_sources]
+    if selected != "All":
+        rows = [r for r in rows if re.search(topics[selected], r["title"]+" "+r["summary"], re.I)]
+    rows.sort(key=lambda r:r["published"] or "",reverse=True)
+    now = datetime.now(UTC)
+    recent = sum(datetime.fromisoformat(r["published"]) >= now-timedelta(hours=6) for r in rows)
+    with st.container(key="desk_kpis_"+channel):
+        cols=st.columns(4)
+        cols[0].metric("ARTICLES",len(rows))
+        cols[1].metric("PUBLISHERS",len({r["source"] for r in rows}))
+        cols[2].metric("LAST 6H / IN WINDOW",recent)
+        latest=timestamp(rows[0]["published"]) if rows else "—"
+        cols[3].metric("LATEST / MALTA",datetime.fromisoformat(rows[0]["published"]).astimezone(LOCAL).strftime("%H:%M") if rows else "—")
+    if not rows:
+        st.info("No stories match these filters. Try All, select a publisher or widen the story window.")
+        return
+    with st.expander("ACTIVITY & SOURCE BREAKDOWN", expanded=False):
+        left,right=st.columns(2)
+        data=pd.DataFrame(rows)
+        data["Hour"]=pd.to_datetime(data["published"],utc=True).dt.floor("h")
+        hours=pd.date_range((now-timedelta(hours=age)).replace(minute=0,second=0,microsecond=0),pd.Timestamp(now).floor("h"),freq="h")
+        activity=data.groupby("Hour").size().reindex(hours,fill_value=0).rename("Articles").rename_axis("Hour").reset_index()
+        activity["Hour"]=activity["Hour"].dt.tz_convert(LOCAL)
+        fig=px.bar(activity,x="Hour",y="Articles",template="plotly_dark",color_discrete_sequence=["#40e0d0"])
+        fig.update_layout(height=170,margin=dict(l=0,r=0,t=5,b=0),xaxis_title=None,yaxis_title=None)
+        left.plotly_chart(fig,use_container_width=True,key="desk_activity_"+channel)
+        counts=data["source"].value_counts().rename_axis("Publisher").reset_index(name="Articles")
+        fig=px.bar(counts,x="Articles",y="Publisher",orientation="h",template="plotly_dark",color_discrete_sequence=["#40e0d0"])
+        fig.update_layout(height=170,margin=dict(l=0,r=0,t=5,b=0),yaxis_title=None)
+        right.plotly_chart(fig,use_container_width=True,key="desk_sources_chart_"+channel)
+        st.caption("Counts cover filtered retrieved articles, not all reporting or confirmed events. Feed limits can leave older hours incomplete.")
+    st.caption(f"{len(rows)} matching articles · showing {min(limit,len(rows))} · latest {latest}")
+    if channel == "Conflicts":
+        st.caption("Regional reporting includes non-conflict stories. Claims are attributed to publishers; article counts do not measure military activity.")
+    for start in range(0,min(limit,len(rows)),3):
+        for col,item in zip(st.columns(3),rows[start:min(start+3,limit)]):
+            with col,st.container(border=True):
+                st.markdown(f'<div class="sport-headline">{escape(item["title"])}</div>',unsafe_allow_html=True)
+                st.caption(f'{item["source"]} · {timestamp(item["published"])}')
+                if item["summary"]:
+                    st.markdown(f'<div class="desk-excerpt">{escape(short_preview(item["summary"],42))}</div>',unsafe_allow_html=True)
+                left,right=st.columns(2)
+                uid=hashlib.sha256(item["url"].encode()).hexdigest()[:16]
+                if left.button("BRIEF",key=f"desk_{channel}_{uid}",use_container_width=True):
+                    story_dialog(item)
+                right.link_button("SOURCE ↗",item["url"],use_container_width=True)
+
+
 def overview_panel(items, errors):
     st.subheader("MARKET PULSE")
     basket = {name: ASSETS[name] if name in ASSETS else MARKET_PRESETS[name]
@@ -775,7 +841,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-12")
+    st.caption("REVISION 2026.10.21-13")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
@@ -854,6 +920,8 @@ def dashboard():
         st.caption("Google News election links may open its publisher redirect. Conflict channels include regional reporting and do not independently confirm military events. Undated articles are excluded from time-filtered feeds.")
     elif section == "Overview":
         overview_panel(items, errors)
+    elif section in ["World", "Politics", "Conflicts"]:
+        news_desk(items, section)
     else:
         st.subheader(section.upper() + " / DISPATCHES")
         if section == "Conflicts":
