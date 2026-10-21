@@ -69,6 +69,46 @@ h3{font-size:1rem!important;}
 .st-key-markets_compact_page [data-testid="stMetric"]{padding:5px 8px!important;}
 .st-key-markets_compact_page [data-testid="stMetricValue"]{font-size:1.12rem!important;line-height:1.4!important;}
 .st-key-markets_compact_page [data-testid="stCaptionContainer"] p{font-size:.68rem;line-height:1.45;}
+
+/* Fluid phone/tablet layout; keep the full desktop grid. */
+@media (max-width: 1024px) {
+  [data-testid="stMainBlockContainer"],.block-container{padding-left:1rem!important;padding-right:1rem!important;}
+  .st-key-overview_pulse [data-testid="stHorizontalBlock"]{flex-wrap:wrap!important;gap:.6rem!important;}
+  .st-key-overview_pulse [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{flex:0 0 calc(33.333% - .6rem)!important;min-width:0!important;width:calc(33.333% - .6rem)!important;}
+}
+@media (max-width: 767px) {
+  [data-testid="stMainBlockContainer"],.block-container{padding-top:3.8rem!important;padding-left:.7rem!important;padding-right:.7rem!important;}
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{flex:1 1 100%!important;width:100%!important;min-width:0!important;}
+  h1{font-size:1.35rem!important;letter-spacing:1.3px!important;line-height:1.4!important;}
+  h2{font-size:1.05rem!important;letter-spacing:1px!important;line-height:1.4!important;}
+  h3{font-size:.95rem!important;letter-spacing:.6px!important;}
+  .tag{letter-spacing:1px;font-size:.7rem;line-height:1.5;}
+  .stButton>button,.stLinkButton>a,[data-testid="stFormSubmitButton"] button{min-height:44px!important;font-size:.8rem!important;white-space:normal!important;}
+  [data-testid="stTextInput"] input{font-size:16px!important;}
+  [data-testid="stRadio"] [role="radiogroup"]{flex-wrap:wrap!important;gap:.4rem .8rem!important;}
+  [data-testid="stTabs"] [role="tablist"]{overflow-x:auto!important;flex-wrap:nowrap!important;gap:.8rem!important;}
+  [data-testid="stTabs"] [role="tab"]{flex-shrink:0!important;min-height:44px!important;}
+  [data-testid="stDialog"] [role="dialog"]{width:calc(100vw - 1rem)!important;max-width:calc(100vw - 1rem)!important;max-height:90dvh!important;}
+  .brief-title{font-size:1rem;line-height:1.5;}
+  .sport-headline{font-size:.93rem;min-height:0;line-height:1.5;}
+  .desk-excerpt{font-size:.83rem;line-height:1.55;}
+  .st-key-overview_pulse [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{flex:0 0 calc(50% - .35rem)!important;min-width:0!important;width:calc(50% - .35rem)!important;}
+  .pulse-header{min-height:100px;}
+  .pulse-header .pulse-name{font-size:.78rem;line-height:20px;}
+  .pulse-header .pulse-price{font-size:1.1rem;line-height:26px;}
+  .pulse-detail{font-size:.74rem;line-height:18px;}
+  .pulse-delta{font-size:.78rem;line-height:20px;}
+  .st-key-overview_pulse [data-testid="stCaptionContainer"] p{font-size:.7rem!important;line-height:1.45!important;}
+  .st-key-overview_kpis [data-testid="stHorizontalBlock"],
+  [class*="st-key-desk_kpis_"] [data-testid="stHorizontalBlock"]{flex-wrap:wrap!important;gap:.5rem!important;}
+  .st-key-overview_kpis [data-testid="stColumn"],
+  [class*="st-key-desk_kpis_"] [data-testid="stColumn"]{flex:0 0 calc(50% - .3rem)!important;width:calc(50% - .3rem)!important;min-width:0!important;}
+  .st-key-markets_compact_page [data-testid="stMetricValue"]{font-size:1.25rem!important;}
+  .st-key-markets_compact_page [data-testid="stCaptionContainer"] p{font-size:.76rem!important;}
+  .st-key-sports_desk [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4)){flex-wrap:wrap!important;gap:.5rem!important;}
+  .st-key-sports_desk [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4)) > [data-testid="stColumn"]{flex:0 0 calc(50% - .3rem)!important;width:calc(50% - .3rem)!important;min-width:0!important;}
+}
+
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -1115,7 +1155,9 @@ def world_monitor(items):
     data=world_geometry()
     if data:
         color="#eeaa55" if layer=="Conflicts" else "#a995ff" if layer=="Elections" else "#40e0d0"
-        m=folium.Map(location=[22,10],zoom_start=2,min_zoom=2,max_zoom=7,tiles=None,control_scale=True,prefer_canvas=True)
+        m=folium.Map(location=[22,10],zoom_start=2,min_zoom=2,max_zoom=7,tiles=None,control_scale=True,prefer_canvas=True,scrollWheelZoom=False)
+        from folium.plugins import Fullscreen
+        Fullscreen(position="topright",title="Full-screen map",title_cancel="Exit full screen").add_to(m)
         m.get_root().header.add_child(folium.Element("<style>.leaflet-container{background:#070d17!important}.leaflet-tooltip{background:#101c2c;color:#dce9f5;border:1px solid #426275;font:12px monospace}</style>"))
         for latitude in range(-60,90,30):
             folium.PolyLine([[latitude,-180],[latitude,180]],color="#183040",weight=.5,opacity=.6,interactive=False).add_to(m)
@@ -1242,7 +1284,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-22")
+    st.caption("REVISION 2026.10.21-23")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
@@ -1295,7 +1337,8 @@ def dashboard():
                 st.caption("EUR uses historical daily EUR/USD closes. Converted candles are estimates; unmatched exchange-rate observations are omitted.")
                 st.link_button("EUR/USD SOURCE ↗", "https://finance.yahoo.com/quote/EURUSD%3DX/")
     elif section == "Sports":
-        sports_panel()
+        with st.container(key="sports_desk"):
+            sports_panel()
     elif section == "US Elections":
         us_elections_panel()
     elif section == "Elections":
