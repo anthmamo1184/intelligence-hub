@@ -375,8 +375,10 @@ def chart_window(frame, period):
 
 def display_price(value, unit):
     # Keep provider quote units exactly as supplied: GBp is pence, not GBP.
-    currency = unit if isinstance(unit, str) and re.fullmatch(r"[A-Za-z]{3}", unit) else ""
-    return f"{value:,.2f}" + (f" {currency}" if currency else "")
+    label = unit if isinstance(unit, str) else ""
+    # Include both quote currency and physical unit beside commodity prices.
+    show_unit = bool(re.fullmatch(r"[A-Za-z]{3}", label)) or " / " in label
+    return f"{value:,.2f}" + (f" {label}" if show_unit else "")
 
 
 def price_figure(frame, unit, candle=False, compact=False):
@@ -395,7 +397,7 @@ def price_figure(frame, unit, candle=False, compact=False):
     pad = max((high - low) * .15, abs(last) * .002, .001)
     fig.add_hline(y=first, line_dash="dot", line_color="#516579", line_width=1)
     fig.add_trace(go.Scatter(x=[frame["Date"].iloc[-1]], y=[last], mode="markers", marker=dict(color=color, size=7), showlegend=False, hoverinfo="skip"))
-    fig.add_annotation(x=1, xref="paper", y=last, text=f"{last:,.2f}", showarrow=False, xanchor="right", yshift=13, font=dict(color=color, size=11), bgcolor="#101c2c")
+    fig.add_annotation(x=1, xref="paper", y=last, text=display_price(last, unit), showarrow=False, xanchor="right", yshift=13, font=dict(color=color, size=11), bgcolor="#101c2c")
     fig.update_layout(template="plotly_dark", height=195 if compact else 430,
         margin=dict(l=6, r=8, t=20, b=5), showlegend=False,
         font=dict(family="Share Tech Mono, monospace", color="#a8becf", size=10 if compact else 12),
@@ -841,7 +843,7 @@ def overview_panel(items, errors):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-13")
+    st.caption("REVISION 2026.10.21-14")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
