@@ -157,7 +157,8 @@ def safe_url(value):
 
 
 @st.cache_data(ttl=180, show_spinner=False)
-def fetch_feed(category, source, url):
+def feed_snapshot(category, source, url):
+    checked = datetime.now(UTC).isoformat()
     try:
         response = requests.get(url, headers=HEADERS, timeout=12)
         response.raise_for_status()
@@ -177,18 +178,31 @@ def fetch_feed(category, source, url):
             publisher = clean(entry.get("source", {}).get("title", source))
             items.append(dict(title=clean(entry.get("title", "Untitled")), url=link,
                               summary=clean(max([entry.get("summary", "")] + [c.get("value", "") for c in entry.get("content", [])], key=lambda text: len(clean(text))))[:6000], source=publisher,
-                              category=category, published=stamp.isoformat() if stamp else None))
-        return items, None
+                              category=category, published=stamp.isoformat() if stamp else None, fetched_at=checked))
+        dated=[a["published"] for a in items if a["published"]]
+        return items, None, dict(Channel=category,Feed=source,URL=url,Checked=checked,Success=checked,Latest=max(dated) if dated else None,Articles=len(items))
     except Exception:
-        return [], source + ": unavailable on this check"
+        return [], source + ": unavailable on this check", dict(Channel=category,Feed=source,URL=url,Checked=checked,Success=None,Latest=None,Articles=0)
+
+
+def fetch_feed(category,source,url):
+    rows,error,_=feed_snapshot(category,source,url)
+    return rows,error
 
 
 def news_data():
     jobs = [(c, s, u) for c, feeds in FEEDS.items() for s, u in feeds]
     with ThreadPoolExecutor(max_workers=8) as pool:
-        results = list(pool.map(lambda job: fetch_feed(*job), jobs))
+        results = list(pool.map(lambda job: feed_snapshot(*job), jobs))
     seen, articles, errors = set(), [], []
-    for rows, error in results:
+    health=[]
+    history=st.session_state.get("feed_success_history",{})
+    for rows, error, metadata in results:
+        if metadata["Success"]:
+            history[metadata["URL"]]=metadata["Success"]
+        else:
+            metadata=dict(metadata,Success=history.get(metadata["URL"]))
+        health.append(dict(metadata,Available=not bool(error)))
         if error:
             errors.append(error)
         for row in rows:
@@ -196,7 +210,88 @@ def news_data():
             if key not in seen:
                 seen.add(key)
                 articles.append(row)
+    st.session_state.feed_success_history=history
+    st.session_state.feed_health=health
     return sorted(articles, key=lambda a: a["published"] or "", reverse=True), errors
+
+
+def elapsed_label(value,now=None):
+    if not value:
+        return "Unknown"
+    stamp=pd.Timestamp(value)
+    stamp=stamp.tz_localize("UTC") if stamp.tzinfo is None else stamp.tz_convert("UTC")
+    seconds=max(0,((now or datetime.now(UTC))-stamp.to_pydatetime()).total_seconds())
+    if seconds<60:return "<1m ago"
+    if seconds<3600:return f"{int(seconds/60)}m ago"
+    if seconds<86400:return f"{int(seconds/3600)}h ago"
+    return f"{int(seconds/86400)}d ago"
+
+
+def market_freshness(frame):
+    last=pd.Timestamp(frame["Date"].iloc[-1])
+    day=last.date()
+    lag=(datetime.now(UTC).date()-day).days
+    # Daily bars are not live ticks. A weekend/holiday alone is not a feed failure.
+    status="OLDER DAILY QUOTE" if lag>4 else "DAILY BAR"
+    fetched=frame.attrs.get("fetched_at")
+    return f"{status} · {day:%d %b}"+(f" · fetched {elapsed_label(fetched)}" if fetched else "")
+
+
+def headline_terms(item):
+    title=re.sub(r"\s+[-–|]\s+(?:Reuters|CNN|Fox News|BBC(?: News)?).*$","",item["title"],flags=re.I)
+    stop=set("a an the to of in on for and or as at by with from is are was were be been says said say after over amid about new latest news live updates update breaking report reports what how why".split())
+    return {w for w in re.findall(r"[a-z0-9]+",title.casefold()) if len(w)>2 and w not in stop}
+
+
+def group_reporting(items):
+    groups=[]
+    for item in sorted(items,key=lambda x:x.get("published") or "",reverse=True):
+        terms=headline_terms(item)
+        match=None
+        for group in groups:
+            lead=group[0]
+            same_url=item["url"]==lead["url"]
+            a,b=item.get("published"),lead.get("published")
+            within=bool(a and b and abs((pd.Timestamp(a)-pd.Timestamp(b)).total_seconds())<=48*3600)
+            other=headline_terms(lead)
+            shared=len(terms & other)
+            similar=shared>=4 and shared/max(1,len(terms|other))>=.50 and shared/max(1,min(len(terms),len(other)))>=.72
+            if same_url or (within and (terms==other and bool(terms) or similar)):
+                match=group
+                break
+        if match is None:
+            groups.append([item])
+        elif not any(r["url"]==item["url"] for r in match):
+            match.append(item)
+    return groups
+
+
+def related_reports(group):
+    if len(group)<2:
+        return
+    publishers=len({r["source"] for r in group})
+    with st.expander(f"RELATED REPORTING · {len(group)} reports / {publishers} publishers"):
+        st.caption("Matched by headline similarity and publication time; related reports may differ in facts or framing.")
+        for report in group:
+            st.markdown(f"**{report['source']}** · {timestamp(report['published'])}")
+            st.write(report["title"])
+            if report["summary"]:
+                st.caption(short_preview(report["summary"],55))
+            st.link_button("READ SOURCE ↗",report["url"])
+
+
+def feed_health_panel():
+    health=st.session_state.get("feed_health",[])
+    if not health:
+        st.caption("Feed status will appear after a feed check.")
+        return
+    data=[]
+    for row in health:
+        latest=row.get("Latest")
+        status="Unavailable" if not row["Available"] else "No dated articles" if not latest else "Older headlines" if (datetime.now(UTC)-pd.Timestamp(latest).to_pydatetime()).total_seconds()>86400 else "Available"
+        data.append({"Channel":row["Channel"],"Feed":row["Feed"],"Status":status,"Last checked":timestamp(row["Checked"]),"Last success":timestamp(row["Success"]) if row["Success"] else "Not observed this session","Latest article":timestamp(latest) if latest else "Unavailable","Articles":row["Articles"]})
+    st.dataframe(pd.DataFrame(data),hide_index=True,use_container_width=True)
+    st.caption("Available means a successful fetch, not a guarantee of complete or current coverage. Older headlines = newest retrieved article over 24h old. Successful times survive failed fetches during this session; unavailable feeds do not serve old stories.")
 
 
 def timestamp(value):
@@ -407,6 +502,7 @@ def market_data(symbol):
         frame = data.reset_index()
         frame = frame[[c for c in ["Date", "Open", "High", "Low", "Close"] if c in frame.columns]]
         frame.attrs["currency"] = ticker.history_metadata.get("currency", "Quote currency unavailable")
+        frame.attrs["fetched_at"] = datetime.now(UTC).isoformat()
         return frame
     except Exception:
         return None
@@ -457,7 +553,7 @@ def price_figure(frame, unit, candle=False, compact=False):
 @st.dialog("MARKET DETAIL", width="large")
 def market_dialog(name, symbol, unit, frame):
     st.subheader(name.upper())
-    st.caption(f"Yahoo Finance · {symbol} · {unit} · Daily observations")
+    st.caption(f"Yahoo Finance · {symbol} · {unit} · {market_freshness(frame)}")
     left, right = st.columns(2)
     period = left.radio("Chart range", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, key="detail_range_"+symbol)
     style = right.radio("Display", ["Line", "Candles"], horizontal=True, key="detail_style_"+symbol)
@@ -549,7 +645,7 @@ def market_panel(names, assets=None, compact_controls=False, commodity_currency=
                     delta = f"{(close/previous-1)*100:+.2f}% vs prior close" if previous else None
                     st.metric(name, display_price(close, unit), delta)
                     unit_label = {"GBp": "GBp · British pence (100 GBp = 1 GBP)", "GBX": "GBX · British pence (100 GBX = 1 GBP)", "ZAc": "ZAc · South African cents", "ILA": "ILA · Israeli agorot"}.get(unit, unit)
-                    st.caption(f'{unit_label} · {frame["Date"].iloc[-1]:%d %b %Y}')
+                    st.caption(f'{unit_label} · {market_freshness(frame)}')
                     if view.empty:
                         st.info("No observations in selected range.")
                     else:
@@ -819,11 +915,13 @@ def news_desk(items, channel, scope=None):
         fig.update_layout(height=170,margin=dict(l=0,r=0,t=5,b=0),yaxis_title=None)
         right.plotly_chart(fig,use_container_width=True,key="desk_sources_chart_"+scope)
         st.caption("Counts cover filtered retrieved articles, not all reporting or confirmed events. Feed limits can leave older hours incomplete.")
-    st.caption(f"{len(rows)} matching articles · showing {min(limit,len(rows))} · latest {latest}")
+    groups=group_reporting(rows)
+    cards=[g[0] for g in groups]
+    st.caption(f"{len(rows)} articles · {len(cards)} story groups · showing {min(limit,len(cards))} groups · latest {latest}")
     if channel == "Conflicts":
         st.caption("Regional reporting includes non-conflict stories. Claims are attributed to publishers; article counts do not measure military activity.")
-    for start in range(0,min(limit,len(rows)),3):
-        for card_index,(col,item) in enumerate(zip(st.columns(3),rows[start:min(start+3,limit)]),start=start):
+    for start in range(0,min(limit,len(cards)),3):
+        for card_index,(col,item) in enumerate(zip(st.columns(3),cards[start:min(start+3,limit)]),start=start):
             with col,st.container(border=True):
                 st.markdown(f'<div class="sport-headline">{escape(item["title"])}</div>',unsafe_allow_html=True)
                 st.caption(f'{item["source"]} · {timestamp(item["published"])}')
@@ -834,6 +932,7 @@ def news_desk(items, channel, scope=None):
                 if left.button("BRIEF",key=f"desk_{scope}_{card_index}_{uid}",use_container_width=True):
                     story_dialog(item)
                 right.link_button("SOURCE ↗",item["url"],use_container_width=True)
+                related_reports(groups[card_index])
 
 
 COUNTRY_ALIASES = {
@@ -917,7 +1016,7 @@ def country_monitor(code):
     if error:
         st.warning(error)
     st.caption("English-language reporting about this country · Google News publisher links · not necessarily local publications")
-    st.caption("Checked "+datetime.now(LOCAL).strftime("%d %b %H:%M Malta")+" · cached up to 3 minutes")
+    st.caption("Country feed fetched "+(elapsed_label(rows[0].get("fetched_at")) if rows else "time unavailable")+" · cached up to 3 minutes")
     # Reuse compact news-desk rendering without a second category exclusion.
     category="Conflicts" if layer=="Conflicts" else "Politics" if layer=="Elections" else "World"
     news_desk([dict(r,category=category) for r in rows],category,scope="country_"+code+"_"+layer)
@@ -1044,7 +1143,7 @@ def overview_panel(items, errors):
                     pad=max((high-low)*.15,abs(high)*.002,.001)
                     fig.update_layout(height=50,margin=dict(l=0,r=0,t=0,b=0),paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",xaxis=dict(visible=False,fixedrange=True),yaxis=dict(visible=False,range=[low-pad,high+pad],fixedrange=True),showlegend=False)
                     st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False},key="pulse_"+symbol)
-                st.caption(f'{frame["Date"].iloc[-1]:%d %b}')
+                st.caption(market_freshness(frame))
                 if st.button("↗",key="pulse_open_"+symbol,help="Open full chart",use_container_width=True):
                     market_dialog(name,symbol,unit,frame)
     st.caption("Daily quotes · Yahoo Finance · delayed · 1M sparklines · metals/oil: futures")
@@ -1054,17 +1153,8 @@ def overview_panel(items, errors):
     for tab, channel in zip(st.tabs(channels), channels):
         with tab:
             selected = items if channel == "All" else [a for a in items if a["category"] == channel]
-            # One article can belong to several desks. Keep one copy per Overview tab.
-            seen_urls, seen_titles, unique = set(), set(), []
-            for article in selected:
-                title_key=re.sub(r"\W", "", article["title"]).casefold()
-                url_key=article["url"]
-                if url_key in seen_urls or title_key in seen_titles:
-                    continue
-                seen_urls.add(url_key)
-                seen_titles.add(title_key)
-                unique.append(article)
-            selected=unique
+            groups=group_reporting(selected)
+            selected=[g[0] for g in groups]
             if not selected:
                 st.caption("No matching stories in this window.")
             for offset in range(0, min(6, len(selected)), 2):
@@ -1077,16 +1167,16 @@ def overview_panel(items, errors):
                         if a.button("OPEN BRIEF", key=f"ov_{channel}_{card_index}_{uid}", use_container_width=True):
                             story_dialog(item)
                         b.link_button("SOURCE ↗", item["url"], use_container_width=True)
+                        related_reports(groups[card_index])
     with st.expander("FEED HEALTH"):
         st.write(f"{sum(map(len, FEEDS.values())) - len(errors)} / {sum(map(len, FEEDS.values()))} feeds available on last check")
-        for error in errors:
-            st.caption(error)
+        feed_health_panel()
         st.caption("Search and story-window filters apply to news only. Market and calendar panels use their own source dates.")
 
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-19")
+    st.caption("REVISION 2026.10.21-20")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
@@ -1117,8 +1207,9 @@ def dashboard():
             a.metric("STORIES IN WINDOW", len(items))
             b.metric("AVAILABLE FEEDS", sum(map(len, FEEDS.values())) - len(errors))
             c.metric("CHANNELS", len(FEEDS))
-            d.metric("CHECKED · MALTA", datetime.now(LOCAL).strftime("%H:%M"))
-        st.caption("Feed check · " + datetime.now(LOCAL).strftime("%H:%M Malta") + " · cached up to 3 minutes")
+            d.metric("VIEW · MALTA", datetime.now(LOCAL).strftime("%H:%M"))
+        stamps=[r["Checked"] for r in st.session_state.get("feed_health",[])]
+        st.caption("Feeds fetched "+(elapsed_label(min(stamps)) if stamps else "time unavailable")+" · cached up to 3 minutes · details in Feed Health")
     if section == "Markets":
         markets_page()
     elif section == "Commodities":
@@ -1159,6 +1250,7 @@ def dashboard():
             for source, url in feeds:
                 st.write(f"{category} · {source}")
                 st.link_button("OPEN FEED ↗", url)
+        feed_health_panel()
         for error in errors:
             st.warning(error)
         st.caption("Fox News section feeds are direct RSS. CNN/Reuters and topic-specific publisher feeds use Google News indexing, not a licensed publisher newswire. Publisher links can redirect; full previews may be limited.")
