@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from html import escape, unescape
 import hashlib
+import json
+from html.parser import HTMLParser
 import re
 from urllib.parse import quote, urlencode, urlparse
 from zoneinfo import ZoneInfo
@@ -22,7 +24,10 @@ CSS = """
 html, body, [class*="css"], [data-testid="stApp"] {font-family:'Share Tech Mono',monospace;}
 h1,h2,h3,[data-testid="stMetricLabel"],button,p label {font-family:'Oxanium',monospace!important;}
 .stApp {background:radial-gradient(ellipse at 80% 0%,#11283a 0%,#070d17 55%);}
-.block-container{padding-top:2rem;max-width:1550px;}
+[data-testid="stMainBlockContainer"],.block-container{padding-top:6rem!important;max-width:1550px;padding-left:2rem;padding-right:2rem;}
+h1,h2,h3{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere!important;}
+.brief-title{font-family:Oxanium,monospace;font-size:1.15rem;line-height:1.5;color:#e1edf7;white-space:normal;overflow-wrap:anywhere;margin:0 0 1rem;}
+@media(max-width:700px){.block-container{padding-left:1rem;padding-right:1rem;}h1{font-size:1.45rem!important;letter-spacing:2px!important;}}
 h1{letter-spacing:4px!important;font-size:2.1rem!important;margin-bottom:0!important;}
 h2{font-size:1.2rem!important;letter-spacing:2px;}
 h3{font-size:1rem!important;}
@@ -58,6 +63,18 @@ ASSETS = {
     "Wheat": ("ZW=F", "US cents / bushel"), "Corn": ("ZC=F", "US cents / bushel"),
     "Coffee": ("KC=F", "US cents / lb"), "S&P 500": ("^GSPC", "index points"),
     "Nasdaq": ("^IXIC", "index points"), "Dow Jones": ("^DJI", "index points"),
+}
+
+
+MARKET_PRESETS = {
+    "S&P 500": ("^GSPC", "index points"), "Nasdaq": ("^IXIC", "index points"),
+    "Dow Jones": ("^DJI", "index points"), "FTSE 100": ("^FTSE", "index points"),
+    "DAX": ("^GDAXI", "index points"), "CAC 40": ("^FCHI", "index points"),
+    "Euro Stoxx 50": ("^STOXX50E", "index points"), "Nikkei 225": ("^N225", "index points"),
+    "Hang Seng": ("^HSI", "index points"), "Brazil Bovespa": ("^BVSP", "index points"),
+    "EUR / USD": ("EURUSD=X", "USD per EUR"), "GBP / USD": ("GBPUSD=X", "USD per GBP"),
+    "USD / BRL": ("BRL=X", "BRL per USD"), "EUR / BRL": ("EURBRL=X", "BRL per EUR"),
+    "Bitcoin": ("BTC-USD", "USD"), "Ethereum": ("ETH-USD", "USD"),
 }
 
 
@@ -102,7 +119,7 @@ def fetch_feed(category, source, url):
                 stamp = None
             publisher = clean(entry.get("source", {}).get("title", source))
             items.append(dict(title=clean(entry.get("title", "Untitled")), url=link,
-                              summary=clean(entry.get("summary", ""))[:1800], source=publisher,
+                              summary=clean(max([entry.get("summary", "")] + [c.get("value", "") for c in entry.get("content", [])], key=lambda text: len(clean(text))))[:6000], source=publisher,
                               category=category, published=stamp.isoformat() if stamp else None))
         return items, None
     except Exception:
@@ -129,13 +146,120 @@ def timestamp(value):
     return datetime.fromisoformat(value).astimezone(LOCAL).strftime("%d %b %H:%M") + " Malta" if value else "Publication time unavailable"
 
 
+class ArticlePreviewParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.in_article = 0
+        self.in_paragraph = False
+        self.in_json = False
+        self.buffer = []
+        self.scripts = []
+        self.paragraphs = []
+        self.description = ""
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "article":
+            self.in_article += 1
+        if tag == "p" and self.in_article:
+            self.in_paragraph = True
+            self.buffer = []
+        if tag == "script" and attrs.get("type", "").lower() == "application/ld+json":
+            self.in_json = True
+            self.json_buffer = []
+        if tag == "meta" and (attrs.get("property") == "og:description" or attrs.get("name") == "description"):
+            self.description = clean(attrs.get("content", "")) or self.description
+
+    def handle_data(self, data):
+        if self.in_json:
+            self.json_buffer.append(data)
+        elif self.in_paragraph:
+            self.buffer.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == "article":
+            self.in_article = max(0, self.in_article-1)
+        if tag == "p" and self.in_paragraph:
+            text = clean(" ".join(self.buffer))
+            if len(text.split()) >= 10:
+                self.paragraphs.append(text)
+            self.in_paragraph = False
+        if tag == "script" and self.in_json:
+            self.scripts.append("".join(self.json_buffer))
+            self.in_json = False
+
+
+def article_body(node):
+    if isinstance(node, dict):
+        if isinstance(node.get("articleBody"), str):
+            return node["articleBody"]
+        for value in node.values():
+            found = article_body(value)
+            if found:
+                return found
+    elif isinstance(node, list):
+        for value in node:
+            found = article_body(value)
+            if found:
+                return found
+    return ""
+
+
+def short_preview(text, words=160):
+    tokens = clean(text).split()
+    return " ".join(tokens[:words]) + (" …" if len(tokens)>words else "")
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def article_preview(url):
+    # Only known public publishers; never follow redirects to another host.
+    allowed = {"www.bbc.co.uk", "bbc.co.uk", "www.bbc.com", "bbc.com", "www.aljazeera.com", "aljazeera.com"}
+    try:
+        for _ in range(3):
+            if urlparse(url).scheme != "https" or urlparse(url).hostname not in allowed:
+                return ""
+            response = requests.get(url, headers=HEADERS, timeout=7, allow_redirects=False)
+            if response.is_redirect:
+                from urllib.parse import urljoin
+                url = urljoin(url, response.headers.get("Location", ""))
+                continue
+            response.raise_for_status()
+            if "html" not in response.headers.get("Content-Type", ""):
+                return ""
+            parser = ArticlePreviewParser()
+            parser.feed(response.text[:2000000])
+            for script in parser.scripts:
+                try:
+                    body = article_body(json.loads(script))
+                    if body:
+                        return short_preview(body)
+                except (ValueError, TypeError):
+                    continue
+            if parser.paragraphs:
+                return short_preview(" ".join(parser.paragraphs[:5]))
+            return short_preview(parser.description)
+        return ""
+    except Exception:
+        return ""
+
+
 @st.dialog("SOURCE BRIEF", width="large")
 def story_dialog(item):
-    st.subheader(item["title"])
+    st.markdown(f'<div class="brief-title">{escape(item["title"])}</div>', unsafe_allow_html=True)
     st.caption(f'{item["source"]} · {timestamp(item["published"])}')
-    st.write(item["summary"] or "Open the original report to read the story.")
+    summary = short_preview(item["summary"], 180)
+    with st.spinner("Loading source preview…"):
+        preview = article_preview(item["url"])
+    # Prefer a longer source excerpt; never pad a short feed with generated claims.
+    text = preview if len(preview.split()) > len(summary.split()) else summary
+    if text:
+        st.write(text)
+    else:
+        st.write("Open the original report to read the story.")
+    if len(text.split()) < 50:
+        st.caption("Only a short preview is available from this source. Read the full report below.")
     st.link_button("OPEN ORIGINAL REPORT ↗", item["url"], use_container_width=True)
-    st.caption("Publisher report. Inclusion does not independently verify claims. Excerpts may be truncated.")
+    st.caption("Source excerpt, up to approximately 160–180 words where available. Some publishers provide shorter previews. Inclusion does not independently verify claims.")
 
 
 def stories(items, prefix, limit=18):
@@ -204,12 +328,15 @@ def sports_panel():
 @st.cache_data(ttl=600, show_spinner=False)
 def market_data(symbol):
     try:
-        data = yf.Ticker(symbol).history(period="1y", interval="1d", auto_adjust=False, timeout=12)
+        ticker = yf.Ticker(symbol)
+        data = ticker.history(period="1y", interval="1d", auto_adjust=False, timeout=12)
         if data.empty:
             return None
         data = data.dropna(subset=["Close"]).sort_index()
         frame = data.reset_index()
-        return frame[[c for c in ["Date", "Open", "High", "Low", "Close"] if c in frame.columns]]
+        frame = frame[[c for c in ["Date", "Open", "High", "Low", "Close"] if c in frame.columns]]
+        frame.attrs["currency"] = ticker.history_metadata.get("currency", "Quote currency unavailable")
+        return frame
     except Exception:
         return None
 
@@ -270,26 +397,29 @@ def market_dialog(name, symbol, unit, frame):
     st.link_button("YAHOO FINANCE ↗", f"https://finance.yahoo.com/quote/{quote(symbol, safe='')}/")
     with st.expander("VIEW PRICE DATA"):
         st.dataframe(view.sort_values("Date", ascending=False), hide_index=True, use_container_width=True)
-    st.caption("Prices may be delayed. Latest daily bar may still be in progress. Futures can roll between contracts; these are not spot or physical retail prices. Period change compares first and last available closes in the selected range.")
+    st.caption("Prices may be delayed. Latest daily bar may still be in progress. Futures, where selected, can roll between contracts and are not spot or physical retail prices. Period change compares first and last available closes in the selected range.")
 
 
-def market_panel(names):
-    st.caption("Yahoo Finance · daily observations · cached 10 minutes · commodities are futures, not spot quotes")
+def market_panel(names, assets=None):
+    assets = ASSETS if assets is None else assets
+    st.caption("Yahoo Finance · latest daily observations · prices may be delayed · cached 10 minutes")
     period = st.radio("TIME RANGE", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, key="market_range_"+section)
     st.caption("Price scales adapt to each asset. Teal = up over selected range; pink = down. Daily change appears beside the price.")
     with ThreadPoolExecutor(max_workers=4) as pool:
-        frames = list(pool.map(lambda n: market_data(ASSETS[n][0]), names))
+        frames = list(pool.map(lambda n: market_data(assets[n][0]), names))
     # Build actual rows so each asset keeps its position as cards change height.
     for offset in range(0, len(names), 3):
         cols = st.columns(3)
         for col, name, frame in zip(cols, names[offset:offset+3], frames[offset:offset+3]):
-            symbol, unit = ASSETS[name]
+            symbol, unit = assets[name]
             with col, st.container(border=True):
                 if frame is None or frame.empty:
                     st.metric(name, "Unavailable")
                     st.caption("Feed unavailable; no substitute price shown.")
                 else:
                     view = chart_window(frame, period)
+                    if unit == "Quote currency":
+                        unit = frame.attrs.get("currency", "Quote currency unavailable")
                     close = float(frame["Close"].iloc[-1])
                     previous = float(frame["Close"].iloc[-2]) if len(frame)>1 else None
                     delta = f"{(close/previous-1)*100:+.2f}% vs prior close" if previous else None
@@ -306,6 +436,158 @@ def market_panel(names):
                     if st.button("EXPAND CHART ↗", key="market_"+symbol, use_container_width=True):
                         market_dialog(name, symbol, unit, frame)
                 st.link_button("SOURCE ↗", f"https://finance.yahoo.com/quote/{quote(symbol, safe='')}/")
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def company_search(query):
+    try:
+        rows = yf.Search(query, max_results=12, news_count=0, timeout=10).quotes
+        return [dict(symbol=row["symbol"], name=row.get("longname") or row.get("shortname") or row["symbol"],
+                     exchange=row.get("exchDisp") or row.get("exchange") or "Exchange unspecified",
+                     kind=row.get("quoteType", "Instrument"))
+                for row in rows if row.get("symbol")], None
+    except Exception:
+        return [], "Company search is temporarily unavailable. You can still use the market watchlist below."
+
+
+def markets_page():
+    st.subheader("MARKETS / COMPANY SEARCH")
+    if "company_watchlist" not in st.session_state:
+        st.session_state.company_watchlist = {}
+    with st.form("company_search_form"):
+        query = st.text_input("Company name or ticker", placeholder="e.g. Apple, Nvidia, Betsson, AAPL…")
+        submitted = st.form_submit_button("SEARCH COMPANIES", use_container_width=True)
+    if submitted:
+        st.session_state.pop("company_result", None)
+        if query.strip():
+            with st.spinner("Searching Yahoo Finance…"):
+                rows, error = company_search(query.strip()[:100])
+            st.session_state.company_results = rows
+            st.session_state.company_error = error
+        else:
+            st.session_state.company_results = []
+            st.session_state.company_error = "Enter a company name or ticker to search."
+    if st.session_state.get("company_error"):
+        st.info(st.session_state.company_error)
+    results = st.session_state.get("company_results", [])
+    if results:
+        selected = st.selectbox("Matching listings — check the exchange", results,
+            format_func=lambda r:f'{r["name"]} · {r["symbol"]} · {r["exchange"]} · {r["kind"]}',
+            key="company_result")
+        st.caption("Different exchanges can quote the same company in different currencies. The chart displays the provider's quote currency.")
+        left, right = st.columns(2)
+        if left.button("ADD TO MY WATCHLIST", use_container_width=True):
+            label = selected["name"] + " · " + selected["symbol"]
+            st.session_state.company_watchlist[label] = (selected["symbol"], "Quote currency")
+            current = st.session_state.get("global_market_selection", ["S&P 500", "Nasdaq", "Dow Jones"])
+            if label not in current:
+                st.session_state.global_market_selection = current + [label]
+            st.success("Added to your session watchlist.")
+        if right.button("OPEN COMPANY CHART", use_container_width=True):
+            with st.spinner("Loading company history…"):
+                frame = market_data(selected["symbol"])
+            if frame is None or frame.empty:
+                st.info("Price history is unavailable for this listing.")
+            else:
+                market_dialog(selected["name"], selected["symbol"], frame.attrs.get("currency", "Quote currency unavailable"), frame)
+    elif submitted and not st.session_state.get("company_error"):
+        st.info("No matching listings found. Try the company's ticker or a shorter name.")
+    registry = {**MARKET_PRESETS, **st.session_state.company_watchlist}
+    st.divider()
+    st.subheader("GLOBAL WATCHLIST")
+    choices = st.multiselect("Markets and companies", list(registry),
+        default=["S&P 500", "Nasdaq", "Dow Jones"] + list(st.session_state.company_watchlist),
+        key="global_market_selection")
+    # New additions should appear immediately even when the user has already customised this widget.
+    missing = [n for n in st.session_state.company_watchlist if n not in choices]
+    if missing:
+        st.caption("Added companies are available in the selector above: " + ", ".join(missing))
+    if choices:
+        market_panel(choices, registry)
+    else:
+        st.info("Choose markets or companies to display their charts.")
+    st.caption("Company watchlist and search choices last for this browser session only.")
+
+
+US_PEW_SOURCE = "https://www.pewresearch.org/politics/2026/10/08/with-americans-in-a-sour-mood-democratic-voters-are-more-engaged-in-midterms/"
+
+
+def election_bar(labels, values, title, percent=False):
+    colors = {"Democrats":"#4c9dff", "Republicans":"#ff627d", "Independents":"#bf9bff", "Vacancies":"#5a687b", "Other candidate":"#bf9bff", "Not sure":"#65798e"}
+    fig = go.Figure(go.Bar(x=values, y=labels, orientation="h", marker_color=[colors.get(x,"#40e0d0") for x in labels],
+        text=[str(v)+("%" if percent else "") for v in values], textposition="auto",
+        hovertemplate="%{y}: %{x}"+("%" if percent else " seats")+"<extra></extra>"))
+    fig.update_layout(title=title, template="plotly_dark", height=270, margin=dict(l=5,r=20,t=45,b=5),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(family="Share Tech Mono, monospace"),
+        xaxis=dict(range=[0,100] if percent else [0,max(values)*1.15], title="Percent" if percent else "Seats", gridcolor="#203044"),
+        yaxis=dict(autorange="reversed"))
+    return fig
+
+
+def us_elections_panel():
+    st.subheader("US ELECTIONS / CONGRESSIONAL CONTROL")
+    election_day = datetime(2026,11,3,tzinfo=ZoneInfo("America/New_York"))
+    days = (election_day.date()-datetime.now(ZoneInfo("America/New_York")).date()).days
+    cols=st.columns(4)
+    cols[0].metric("ELECTION DAY", "03 NOV 2026")
+    cols[1].metric("DAYS TO ELECTION", max(days,0))
+    cols[2].metric("HOUSE SEATS", "435")
+    cols[3].metric("SENATE TOTAL", "100")
+    st.caption("Congress = House of Representatives + Senate. All House seats and roughly one-third of Senate seats are elected every two years.")
+    page=st.radio("US election view",["Control & seats","Published polling","Seat simulator","Reporting & sources"],horizontal=True,key="us_view")
+    if page=="Control & seats":
+        st.info("Membership snapshots checked 21 Oct 2026. These are existing seats, not projected 2026 winners or election-night results. They do not update automatically.")
+        left,right=st.columns(2)
+        with left:
+            st.plotly_chart(election_bar(["Democrats","Republicans","Independents","Vacancies"],[214,218,1,2],"HOUSE / EXISTING MEMBERSHIP"),use_container_width=True)
+            st.caption("435 seats · 218 is a majority of the full chamber. The majority required in a particular vote can depend on attendance and vacancies.")
+            st.link_button("OFFICIAL HOUSE BREAKDOWN ↗","https://radiotv.house.gov/house-data/party-breakdown")
+            st.caption("Source page last updated 2 Sep 2026; retrieved 21 Oct 2026.")
+        with right:
+            st.plotly_chart(election_bar(["Democrats","Republicans","Independents"],[45,53,2],"SENATE / EXISTING MEMBERSHIP"),use_container_width=True)
+            st.caption("100 seats · 51 is an outright majority. A 50–50 split involves the vice-president's tie-breaking role. The two independents caucus with Democrats; party and caucus totals differ.")
+            st.link_button("OFFICIAL SENATE MEMBERSHIP ↗","https://www.senate.gov/senators/")
+            st.caption("Senate directory retrieved 21 Oct 2026.")
+    elif page=="Published polling":
+        st.markdown("### HOUSE VOTING INTENTION")
+        st.caption("Dated snapshot · Pew Research Center · Published 8 Oct 2026 · Fieldwork 28 Sep–4 Oct 2026 · 3,917 registered voters")
+        st.plotly_chart(election_bar(["Democrats","Republicans","Other candidate","Not sure"],[44,36,5,15],"NATIONAL HOUSE PREFERENCE / SINGLE POLL",True),use_container_width=True)
+        st.caption("Democratic lead: 8 percentage points in this poll. This is a national voting-intention survey, not an exit poll, polling average, Senate-race poll or seat forecast. It is not necessarily the latest available poll.")
+        st.link_button("POLL / FULL METHODOLOGY ↗",US_PEW_SOURCE)
+        st.markdown("### VOTER ENGAGEMENT")
+        fig=go.Figure()
+        for name,values,color in [("Democratic candidate supporters",[78,50,63],"#4c9dff"),("Republican candidate supporters",[69,36,46],"#ff627d")]:
+            fig.add_trace(go.Bar(name=name,x=["Party control really matters","Given election a lot of thought","Extremely motivated to vote"],y=values,marker_color=color,text=[str(v)+"%" for v in values],textposition="auto"))
+        fig.update_layout(template="plotly_dark",barmode="group",height=340,yaxis=dict(range=[0,100],title="Supporters (%)"),legend=dict(orientation="h",y=1.2),margin=dict(t=70,b=10),paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig,use_container_width=True)
+        st.caption("Same Pew survey and fieldwork. These percentages describe engagement among each party's supporters, not vote share or likelihood of winning.")
+        if days>0:
+            st.info("EXIT POLLS / VOTER SURVEYS: general-election figures are not yet available. Pre-election opinion polls are shown separately above.")
+        else:
+            st.info("EXIT POLLS / RESULTS: no live licensed election-night feed is connected. This app does not display exit-poll percentages or live race calls.")
+        st.link_button("AP VOTER POLL / EXPLANATION ↗","https://www.ap.org/elections/our-role-in-the-u-s-elections/how-we-survey-the-electorate/")
+        st.markdown("### ADD MORE SOURCED POLLS")
+        polling_panel()
+    elif page=="Seat simulator":
+        st.warning("ILLUSTRATIVE SCENARIO — manually selected seats, not a model, poll estimate or prediction.")
+        house=st.slider("Hypothetical Democratic House seats",0,435,214,key="sim_house")
+        rep_house=435-house
+        st.plotly_chart(election_bar(["Democrats","Republicans"],[house,rep_house],"HOUSE / YOUR SCENARIO"),use_container_width=True)
+        st.write(f'{"Democrats" if house>=218 else "Republicans"} hold a majority in this two-party scenario. Assumes all 435 seats filled and no independents.')
+        senate=st.slider("Hypothetical Democratic-aligned Senate seats",0,100,47,key="sim_senate")
+        st.plotly_chart(election_bar(["Democrats","Republicans"],[senate,100-senate],"SENATE / YOUR CAUCUS SCENARIO"),use_container_width=True)
+        st.caption("Democratic-aligned total includes any independents assumed to caucus with Democrats. All remaining seats are assumed Republican-aligned.")
+        st.write("50–50 split: vice-presidential tie-breaking role applies." if senate==50 else f'{"Democratic-aligned" if senate>50 else "Republican-aligned"} caucus has an outright majority in this scenario.')
+    else:
+        st.link_button("USAGOV / HOW CONGRESSIONAL ELECTIONS WORK ↗","https://www.usa.gov/midterm-elections")
+        st.link_button("HOUSE / MEMBERSHIP ↗","https://radiotv.house.gov/house-data/party-breakdown")
+        st.link_button("SENATE / MEMBERSHIP ↗","https://www.senate.gov/senators/")
+        st.link_button("PEW / POLLING REPORT ↗",US_PEW_SOURCE)
+        st.link_button("AP / ELECTION SURVEY METHODS ↗","https://www.ap.org/elections/our-role-in-the-u-s-elections/how-we-survey-the-electorate/")
+        entries,error=fetch_feed("US Elections","Google News · US elections","https://news.google.com/rss/search?"+urlencode({"q":"US midterm House Senate election when:7d","hl":"en-US","gl":"US","ceid":"US:en"}))
+        if error:st.caption(error)
+        st.caption("Latest retrieved reporting below is refreshed from the news feed; membership and polling snapshots above retain their stated dates.")
+        stories(entries,"us_election_news",12)
 
 
 @st.cache_data(ttl=21600, show_spinner=False)
@@ -364,14 +646,15 @@ def polling_panel():
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "Commodities", "Markets", "Alerts", "Sources"])
+    st.caption("REVISION 2026.10.21-05")
+    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Alerts", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
-    watch = st.text_area("ALERT KEYWORDS · comma separated", value="Malta, Brazil, Juventus, Betsson")
+    watch = ""
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
     auto = st.toggle("Auto-refresh every 3 minutes", value=True)
     if st.button("REFRESH FEEDS", use_container_width=True):
         st.cache_data.clear()
-    st.caption("Alerts are keyword matches while this page is open. Phone notifications are not connected.")
+
 
 st.markdown('<div class="tag">GLOBAL MONITORING / PERSONAL TERMINAL</div>', unsafe_allow_html=True)
 st.title("INTELLIGENCE HUB")
@@ -391,17 +674,21 @@ def dashboard():
     a, b, c, d = st.columns(4)
     a.metric("STORIES IN WINDOW", len(items))
     b.metric("AVAILABLE FEEDS", sum(map(len, FEEDS.values())) - len(errors))
-    c.metric("KEYWORD MATCHES", len(matches))
+    c.metric("CHANNELS", len(FEEDS))
     d.metric("CHECKED · MALTA", datetime.now(LOCAL).strftime("%H:%M"))
     st.caption("Checked time is this dashboard check; publication times appear on each story. Feed responses may be cached for 3 minutes.")
     st.divider()
-    if section in {"Commodities", "Markets"}:
-        st.subheader(section.upper())
-        defaults = list(ASSETS)[:6] if section == "Commodities" else list(ASSETS)[11:]
-        choices = st.multiselect("Watchlist", list(ASSETS), default=defaults)
+    if section == "Markets":
+        markets_page()
+    elif section == "Commodities":
+        st.subheader("COMMODITIES")
+        st.caption("Commodity quotes are futures, not spot prices.")
+        choices = st.multiselect("Watchlist", list(ASSETS)[:11], default=list(ASSETS)[:6])
         market_panel(choices)
     elif section == "Sports":
         sports_panel()
+    elif section == "US Elections":
+        us_elections_panel()
     elif section == "Elections":
         st.subheader("WORLD ELECTION WATCH")
         st.caption("Calendar covers the previous 7 days and next 180 days. Community-maintained dates may be incomplete or change; verify at source.")
@@ -427,16 +714,23 @@ def dashboard():
         st.caption("Google News election links may open its publisher redirect. Conflict channels include regional reporting and do not independently confirm military events. Undated articles are excluded from time-filtered feeds.")
     elif section == "Alerts":
         st.subheader("KEYWORD ALERTS")
-        st.caption("Matches within fetched headlines and excerpts; not an exhaustive monitoring service.")
-        stories(matches, "alerts")
+        alert_terms = st.text_input("Your keywords (optional)", value="", placeholder="Enter keywords separated by commas", key="private_alert_terms")
+        alert_keywords = [term.strip().casefold() for term in alert_terms.split(",") if term.strip()]
+        alert_matches = [item for item in items if any(term in (item["title"] + " " + item["summary"]).casefold() for term in alert_keywords)]
+        st.caption("Keywords apply only to this session. Matches cover fetched headlines and excerpts while this page is open; phone notifications are not connected.")
+        if alert_keywords:
+            stories(alert_matches, "alerts")
+        else:
+            st.info("Add keywords above to create your own session watchlist.")
     elif section == "Overview":
         left, right = st.columns([2, 1])
         with left:
             st.subheader("LATEST DISPATCHES")
             stories(items, "overview", 15)
         with right:
-            st.subheader("WATCHLIST SIGNALS")
-            stories(matches, "watch", 5)
+            if keywords:
+                st.subheader("WATCHLIST SIGNALS")
+                stories(matches, "watch", 5)
             st.subheader("COVERAGE")
             if items:
                 counts = pd.Series([a["category"] for a in items]).value_counts().rename_axis("Channel").reset_index(name="Stories")
