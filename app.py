@@ -158,6 +158,17 @@ h3{font-size:1rem!important;}
     .st-key-brief_scroll{max-height:60vh!important;max-height:60dvh!important;padding-right:.35rem;}
 }
 
+
+.st-key-changes_strip{border:1px solid #214252;border-radius:5px;background:#0c1723;padding:5px 9px;margin-bottom:6px;}
+.changes-summary{font: .78rem/1.5 "Share Tech Mono",monospace;padding:8px 0;color:#b1c8d6;}
+.st-key-changes_strip [data-testid="stVerticalBlock"]{gap:0!important;}
+.st-key-changes_strip button{font-size:.7rem!important;min-height:32px!important;}
+@media(max-width:767px){
+ .st-key-changes_strip [data-testid="stColumn"]:first-child{flex:1 1 58%!important;width:58%!important;min-width:0!important;}
+ .st-key-changes_strip [data-testid="stColumn"]:last-child{flex:0 0 35%!important;width:35%!important;min-width:0!important;}
+ .changes-summary{font-size:.72rem;line-height:1.4;padding:5px 0;}
+}
+
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -202,6 +213,12 @@ FEEDS["Elections"] += [
     ("CNN · Elections via Google News", publisher_search_feed("cnn.com", "election OR voting")),
     ("Reuters · Elections via Google News", publisher_search_feed("reuters.com", "election OR voting")),
     ("Fox News · Elections via Google News", publisher_search_feed("foxnews.com", "election OR voting")),
+]
+
+FEEDS["Crypto"] = [
+    ("Reuters · Crypto via Google News", publisher_search_feed("reuters.com", "bitcoin OR ethereum OR cryptocurrency")),
+    ("CNN · Crypto via Google News", publisher_search_feed("cnn.com", "bitcoin OR cryptocurrency")),
+    ("BBC · Crypto via Google News", publisher_search_feed("bbc.com", "bitcoin OR cryptocurrency")),
 ]
 
 ASSETS = {
@@ -295,10 +312,20 @@ def fetch_feed(category,source,url):
 
 def required_news_channels(page):
     if page == "Overview":
-        return tuple(c for c in FEEDS if c != "Sports")
-    if page == "Sources":
+        return tuple(c for c in FEEDS if c not in ("Sports","Crypto"))
+    if page=="Sources":
         return tuple(FEEDS)
-    if page in ("World", "Politics", "Conflicts", "Elections"):
+    if page=="My Briefing":
+        profile=st.session_state.get("user_interests",{})
+        countries=st.session_state.get("_briefing_countries",profile.get("countries",[]))
+        topics=st.session_state.get("_briefing_topics",profile.get("topics",[]))
+        keywords=st.session_state.get("_briefing_keywords",profile.get("keywords","")).strip()
+        if countries or keywords:return tuple(FEEDS)
+        mapping={"Diplomacy & policy":("World","Politics"),"Economy & energy":("World","Markets"),"Elections":("Elections","Politics"),"Conflicts":("Conflicts","World"),"Crypto":("Crypto",),"Sports":("Sports",)}
+        return tuple(dict.fromkeys(c for topic in topics for c in mapping.get(topic,())))
+    if page=="Timelines":
+        return tuple(c for c in FEEDS if c not in ("Sports","Crypto"))
+    if page in ("World", "Politics", "Conflicts", "Elections", "Crypto"):
         return (page,)
     # Sports, country briefings and US reporting already have dedicated feeds.
     return ()
@@ -424,12 +451,15 @@ def group_reporting(items):
     return groups
 
 
-def related_reports(group):
+def related_reports(group,scope="related"):
     if len(group)<2:
         return
     publishers=len({r["source"] for r in group})
     with st.expander(f"RELATED REPORTING · {len(group)} reports / {publishers} publishers"):
         st.caption("Matched by headline similarity and publication time; related reports may differ in facts or framing.")
+        timeline_key=hashlib.sha256((scope+"|"+"|".join(sorted(r["url"] for r in group))).encode()).hexdigest()[:20]
+        if st.button("OPEN REPORT TIMELINE",key="timeline_"+timeline_key,use_container_width=True):
+            timeline_dialog(group)
         for report in group:
             st.markdown(f"**{report['source']}** · {timestamp(report['published'])}")
             st.write(report["title"])
@@ -583,6 +613,7 @@ def story_dialog(item):
             st.write("Open the original report to read the story.")
         if len(text.split()) < 50:
             st.caption("Only a short preview is available from this source. Read the full report below.")
+        st.caption(report_context(item))
         st.link_button("OPEN ORIGINAL REPORT ↗", item["url"], use_container_width=True)
         st.caption("Source excerpt · up to 280 words when accessible · not an AI-written analysis. Inclusion does not independently verify claims.")
 
@@ -1106,7 +1137,7 @@ def news_desk(items, channel, scope=None):
                 if left.button("BRIEF",key=f"desk_{scope}_{card_index}_{uid}",use_container_width=True):
                     story_dialog(item)
                 right.link_button("SOURCE ↗",item["url"],use_container_width=True)
-                related_reports(groups[card_index])
+                related_reports(groups[card_index],scope=f"desk_{scope}_{card_index}")
 
 
 COUNTRY_ALIASES = {
@@ -1159,7 +1190,7 @@ def country_news(code, layer, hours):
     country=country_catalog()[code]
     aliases=country["aliases"][:2]
     country_query="("+" OR ".join('"'+a+'"' for a in aliases)+")"
-    topic={"All":"", "Conflicts":" (war OR conflict OR ceasefire OR military OR humanitarian)", "Elections":" (election OR voting OR ballot OR polling)"}[layer]
+    topic={"All":"", "Conflicts":" (war OR conflict OR ceasefire OR military OR humanitarian)", "Elections":" (election OR voting OR ballot OR polling)", "Economy":" (economy OR inflation OR energy OR central bank OR trade)", "Policy":" (diplomacy OR sanctions OR treaty OR legislation OR policy)"}[layer]
     query=country_query+topic+f" when:{hours}h"
     url="https://news.google.com/rss/search?"+urlencode({"q":query,"hl":"en-GB","gl":"GB","ceid":"GB:en"})
     return fetch_feed("World", "Google News · "+country["name"], url)
@@ -1179,23 +1210,45 @@ def country_monitor(code):
     if st.button("← BACK TO WORLD MONITOR",key="back_monitor"):
         st.session_state.pop("monitor_country",None)
         st.rerun()
-    st.subheader(catalog[code]["name"].upper()+" / COUNTRY BRIEFING")
-    layer=st.radio("COUNTRY COVERAGE",["All","Conflicts","Elections"],index=["All","Conflicts","Elections"].index(st.session_state.get("monitor_country_layer","All")),horizontal=True,key="country_layer_"+code)
+    country=catalog[code]
+    st.subheader(country["name"].upper()+" / COUNTRY BRIEFING")
+    views=["Briefing","Economy & energy","Diplomacy & policy","Elections","Timeline","Videos"]
+    view=st.radio("COUNTRY VIEW",views,horizontal=True,key="country_view_"+code)
+    if view=="Videos":
+        videos_panel(code)
+        return
+    topic={"Economy & energy":"Economy","Diplomacy & policy":"Policy","Elections":"Elections"}.get(view,"All")
+    if view=="Briefing":
+        focus=st.radio("REPORTING FOCUS",["All","Conflicts","Elections"],index=["All","Conflicts","Elections"].index(st.session_state.get("monitor_country_layer","All")),horizontal=True,key="country_layer_"+code)
+        topic=focus
     with st.spinner("Loading country reporting…"):
-        rows,error=country_news(code,layer,age)
-    cutoff=datetime.now(UTC)-timedelta(hours=age)
-    rows=[r for r in rows if r["published"] and datetime.fromisoformat(r["published"])>=cutoff]
-    if search.strip():
-        rows=[r for r in rows if search.casefold() in (r["title"]+" "+r["summary"]).casefold()]
-    if error:
-        st.warning(error)
-    st.caption("English-language reporting about this country · Google News publisher links · not necessarily local publications")
-    st.caption("Country feed fetched "+(elapsed_label(rows[0].get("fetched_at")) if rows else "time unavailable")+" · cached up to 3 minutes")
-    # Reuse compact news-desk rendering without a second category exclusion.
-    category="Conflicts" if layer=="Conflicts" else "Politics" if layer=="Elections" else "World"
-    news_desk([dict(r,category=category) for r in rows],category,scope="country_"+code+"_"+layer)
-    if layer == "Elections":
-        st.caption("Reporting is separate from official polling/results. No verified polling dataset is currently connected.")
+        rows,error=country_news(code,topic,age)
+    rows=filter_reports(rows)
+    if error:st.warning(error)
+    st.caption("English-language publisher reporting about this country · indexed by Google News · source attribution does not independently verify a claim")
+    st.caption("Feed fetched "+(elapsed_label(rows[0].get("fetched_at")) if rows else "time unavailable")+" · selected story window applies")
+    if view in ("Briefing","Elections"):
+        dates,calendar_error=elections_calendar()
+        matching=[r for r in election_countdowns(dates) if code in country_mentions(r["Country"],catalog)]
+        with st.expander("NATIONAL ELECTION WATCH",expanded=view=="Elections"):
+            if matching:
+                st.dataframe(pd.DataFrame(matching),hide_index=True,use_container_width=True,column_config={"Source":st.column_config.LinkColumn("Calendar source")})
+            else:
+                st.caption(calendar_error or "No upcoming national election returned for this country.")
+            st.caption("Community-maintained dates require verification at election authorities. Official polling/results are not connected.")
+    if view=="Timeline":
+        render_timeline(rows)
+        return
+    if view=="Briefing" and rows:
+        st.markdown("#### KEY DEVELOPMENTS / RETRIEVED REPORTS")
+        for group in group_reporting(rows)[:3]:
+            st.markdown("**"+group[0]["title"]+"**")
+            st.caption(group[0]["source"]+" · "+timestamp(group[0]["published"])+" · "+report_context(group[0]))
+        st.caption("Headlines selected by publication time; this is a source digest, not an independently verified assessment.")
+    category="Conflicts" if topic=="Conflicts" else "Politics" if topic in ("Elections","Policy") else "Markets" if topic=="Economy" else "World"
+    # The reusable desk uses its topic configuration; economic reports use the World configuration.
+    desk_category=category if category in ("World","Politics","Conflicts") else "World"
+    news_desk([dict(r,category=desk_category) for r in rows],desk_category,scope="country_"+code+"_"+topic)
 
 
 def election_countdowns(rows):
@@ -1220,21 +1273,20 @@ def map_highlight(conflict,election,coverage):
 
 def world_monitor(items):
     st.subheader("WORLD MONITOR")
-    controls,selector=st.columns([1.2,1])
+    controls,selector,settings=st.columns([2,2,1])
     layer=controls.radio("MAP LAYER",["All","Conflicts","Elections"],horizontal=True,key="world_layer",label_visibility="collapsed")
     catalog=country_catalog()
     ordered=sorted(catalog,key=lambda code:catalog[code]["name"])
     with selector:
-        selection=st.selectbox("Find a country",[None]+ordered,format_func=lambda code: "Search / select any country…" if code is None else catalog[code]["name"],key="country_picker",label_visibility="collapsed")
-        if selection and st.button("OPEN COUNTRY ↗",key="open_picked_country",use_container_width=True):
-            open_country(selection)
-    with st.popover("★ COUNTRY FAVOURITES"):
-        favourites=st.multiselect("Pin countries",ordered,default=[],format_func=lambda code:catalog[code]["name"],max_selections=6,key="country_favourites")
-        st.caption("Blank by default · saved for your current browser session only")
-    if favourites:
-        for col,code in zip(st.columns(len(favourites)),favourites):
-            if col.button(catalog[code]["name"],key="favourite_country_"+code,use_container_width=True):
-                open_country(code)
+        selection=st.selectbox("Find a country",[None]+ordered,format_func=lambda code:"Find a country…" if code is None else catalog[code]["name"],key="country_picker",label_visibility="collapsed")
+        if selection and st.button("OPEN COUNTRY ↗",key="open_picked_country",use_container_width=True):open_country(selection)
+    with settings.popover("MAP OPTIONS",use_container_width=True):
+        region=st.selectbox("Map region",["World","Europe","Middle East","Americas","Asia-Pacific","Africa"],key="map_region")
+        favourites=st.multiselect("Favourite countries",ordered,default=st.session_state.get("saved_country_favourites",[]),format_func=lambda code:catalog[code]["name"],max_selections=6,key="country_favourites")
+        st.session_state.saved_country_favourites=list(favourites)
+        st.caption("Country-level mentions in retrieved news. Colours indicate reporting topics; they are not verified war-zone boundaries or threat ratings.")
+        for code in favourites:
+            if st.button("★ "+catalog[code]["name"],key="favourite_country_"+code,use_container_width=True):open_country(code)
     counts={}
     conflict_counts,election_counts={},{}
     for item in items:
@@ -1261,7 +1313,9 @@ def world_monitor(items):
     data=world_geometry()
     if data:
         color="#eeaa55" if layer=="Conflicts" else "#a995ff" if layer=="Elections" else "#40e0d0"
-        m=folium.Map(location=[22,10],zoom_start=2,min_zoom=2,max_zoom=7,tiles=None,control_scale=True,prefer_canvas=True,scrollWheelZoom=False)
+        regions={"World":([22,10],2),"Europe":([52,15],4),"Middle East":([30,43],4),"Americas":([15,-80],3),"Asia-Pacific":([24,115],3),"Africa":([1,20],3)}
+        center,zoom=regions[region]
+        m=folium.Map(location=center,zoom_start=zoom,min_zoom=1,max_zoom=7,tiles=None,control_scale=True,prefer_canvas=True,scrollWheelZoom=False)
         from folium.plugins import Fullscreen
         Fullscreen(position="topright",title="Full-screen map",title_cancel="Exit full screen").add_to(m)
         m.get_root().header.add_child(folium.Element("<style>.leaflet-container{background:#070d17!important}.leaflet-tooltip{background:#101c2c;color:#dce9f5;border:1px solid #426275;font:12px monospace}</style>"))
@@ -1288,8 +1342,8 @@ def world_monitor(items):
             f["properties"]=props
             features.append(f)
         boundaries={"type":"FeatureCollection","features":features}
-        folium.GeoJson(boundaries,name="Countries",style_function=lambda f:{"fillColor":f["properties"]["fill"],"color":"#426275","weight":.6,"fillOpacity":.50 if f["properties"]["highlight"] else .13},highlight_function=lambda f:{"weight":2,"color":"#8cffff","fillOpacity":.7},tooltip=folium.GeoJsonTooltip(fields=["Country","Articles","Calendar elections","Next national vote"],aliases=["Country","Retrieved articles","Upcoming calendar entries","Next national vote"],sticky=False),embed=True).add_to(m)
-        result=st_folium(m,height=410,use_container_width=True,key="world_map_"+layer,returned_objects=["last_clicked"])
+        folium.GeoJson(boundaries,name="Countries",style_function=lambda f:{"fillColor":f["properties"]["fill"],"color":"#426275","weight":.6,"fillOpacity":.32 if f["properties"]["highlight"] else .10},highlight_function=lambda f:{"weight":2,"color":"#8cffff","fillOpacity":.7},tooltip=folium.GeoJsonTooltip(fields=["Country","Articles","Calendar elections","Next national vote"],aliases=["Country","Retrieved articles","Upcoming calendar entries","Next national vote"],sticky=False),embed=True).add_to(m)
+        result=st_folium(m,height=330,use_container_width=True,key="world_map_"+layer+"_"+region,returned_objects=["last_clicked"])
         click=result.get("last_clicked") if result else None
         fingerprint=(layer,click.get("lat"),click.get("lng")) if click else None
         if click and fingerprint != st.session_state.get("monitor_last_click"):
@@ -1303,16 +1357,12 @@ def world_monitor(items):
     else:
         st.info("Map boundaries are unavailable. Select a country above to open its briefing.")
     st.markdown('<div style="font-size:.75rem;line-height:1.7"><span style="color:#eeaa55">● Conflict reporting</span> &nbsp; <span style="color:#a995ff">● Election news / dates</span> &nbsp; <span style="color:#e785c6">● Both</span> &nbsp; <span style="color:#40e0d0">● Other coverage</span></div>',unsafe_allow_html=True)
-    st.caption("Click a country or use search. Highlighting means country mentions in retrieved reports"+(" or upcoming calendar entries." if layer in ["All","Elections"] else "."))
-    st.caption("Conflicts uses keyword-matched reporting, not verified war-zone boundaries. Mentions can concern several countries. No highlight does not imply no conflict or election.")
-    if calendar_error:
-        st.caption("Election calendar unavailable on this check; election news remains available.")
-    if counts:
-        st.caption("COUNTRIES IN RETRIEVED COVERAGE")
-        leading=sorted(counts,key=counts.get,reverse=True)[:6]
-        for col,code in zip(st.columns(3),leading[:3]):
-            if col.button(f'{catalog[code]["name"]} · {counts[code]}',key="country_shortcut_"+code,use_container_width=True):
-                open_country(code)
+    st.caption("Click a country for its briefing · colours show retrieved reporting and calendar coverage")
+    with st.popover("MAP INFORMATION & COVERAGE"):
+        st.caption("Conflict highlights use keyword-matched reporting, not verified war-zone boundaries. Mentions can concern several countries; no highlight does not establish absence of conflict or elections.")
+        if calendar_error:st.caption("Election calendar unavailable on this check; news remains available.")
+        for code in sorted(counts,key=counts.get,reverse=True)[:8]:
+            if st.button(f'{catalog[code]["name"]} · {counts[code]} reports',key="country_shortcut_"+code,use_container_width=True):open_country(code)
     with st.expander("ELECTION DATES / SOURCES",expanded=False):
         upcoming=election_countdowns(calendar_rows)
         if upcoming:
@@ -1342,34 +1392,40 @@ def update_overview_changes(items, previous=None):
     return state
 
 
-def overview_changes(all_items, visible_items):
-    state=update_overview_changes(all_items,st.session_state.get("overview_change_state"))
-    st.session_state.overview_change_state=state
-    st.subheader("WHAT CHANGED")
-    visible={report_key(r) for r in visible_items}
-    pending=[r for key,r in state["pending"].items() if key in visible]
-    groups=group_reporting(pending)
-    if not groups:
-        st.caption("No newly retrieved reports in your current filters. Tracking started "+timestamp(state["started"])+" during this visit.")
-    else:
-        st.caption(f"{len(groups)} new reporting groups in your current filters · discovered during this visit")
-        for index,group in enumerate(groups[:3]):
-            item=group[0]
-            with st.container(border=True):
-                st.markdown(f'<div class="tag">NEW REPORT · {escape(item["category"].upper())}</div><div class="sport-headline">{escape(item["title"])}</div>',unsafe_allow_html=True)
-                st.caption(f'{item["source"]} · {timestamp(item["published"])}')
-                if st.button("OPEN BRIEF",key=f"change_brief_{index}",use_container_width=True):
-                    story_dialog(item)
-                related_reports(group)
-        if len(groups)>3:
-            with st.expander(f"{len(groups)-3} MORE REPORTING GROUPS"):
-                for group in groups[3:]:
-                    st.link_button(group[0]["title"],group[0]["url"])
-        if st.button("MARK UPDATES AS READ",key="clear_overview_changes"):
+@st.dialog("NEW REPORTS / THIS VISIT",width="large")
+def updates_dialog(groups):
+    with st.container(key="brief_scroll",border=False):
+        st.caption("Newly retrieved reporting during this session. Publication time may precede discovery; these are not independently verified event changes.")
+        selected=st.selectbox("Choose report",list(range(len(groups))),format_func=lambda i:groups[i][0]["title"],key="updates_selected_report")
+        item=groups[selected][0]
+        st.write(item["title"])
+        st.caption(item["source"]+" · "+timestamp(item["published"]))
+        st.write(short_preview(item.get("summary",""),180))
+        if st.button("LOAD LONGER SOURCE PREVIEW",key="updates_load_preview"):
+            with st.spinner("Loading source preview…"):
+                text=article_preview(item["url"])
+            if text:st.write(text)
+            else:st.caption("No longer preview available; open the original source.")
+        st.link_button("OPEN SOURCE ↗",item["url"],use_container_width=True)
+        with st.expander("ALL NEW HEADLINES"):
+            for group in groups:st.link_button(group[0]["title"],group[0]["url"])
+        if st.button("MARK UPDATES AS READ",key="clear_overview_changes",use_container_width=True):
+            state=st.session_state.overview_change_state
             state["pending"]={}
             st.session_state.overview_change_state=state
             st.rerun()
-    st.caption("Tracks newly retrieved reports during this session; it does not independently establish new world events. Reloading the session starts a new baseline.")
+
+
+def overview_changes(all_items, visible_items):
+    state=update_overview_changes(all_items,st.session_state.get("overview_change_state"))
+    st.session_state.overview_change_state=state
+    visible={report_key(r) for r in visible_items}
+    groups=group_reporting([r for key,r in state["pending"].items() if key in visible])
+    with st.container(key="changes_strip"):
+        summary,action=st.columns([4,1])
+        label=f"{len(groups)} new reporting groups" if groups else "No new reports · monitoring this visit"
+        summary.markdown('<div class="changes-summary" title="Newly retrieved reports in your current filters, tracked during this browser session"><span style="color:#40e0d0">UPDATES</span> &nbsp; '+escape(label)+'</div>',unsafe_allow_html=True)
+        if action.button("VIEW UPDATES" if groups else "UP TO DATE",key="open_updates",disabled=not bool(groups),use_container_width=True):updates_dialog(groups)
 
 
 def overview_panel(items, errors, change_items=None):
@@ -1433,7 +1489,7 @@ def overview_panel(items, errors, change_items=None):
                         if a.button("OPEN BRIEF", key=f"ov_{channel}_{card_index}_{uid}", use_container_width=True):
                             story_dialog(item)
                         b.link_button("SOURCE ↗", item["url"], use_container_width=True)
-                        related_reports(groups[card_index])
+                        related_reports(groups[card_index],scope=f"ov_{channel}_{card_index}")
     with st.expander("FEED STATISTICS & HEALTH",expanded=False):
         health=st.session_state.get("feed_health",[])
         st.caption(f"{len(items)} retrieved articles in your filters · {sum(bool(r['Available']) for r in health)} / {len(health)} checked feeds available")
@@ -1441,12 +1497,291 @@ def overview_panel(items, errors, change_items=None):
         st.caption("Search and story-window filters apply to news only. Market and calendar panels use their own source dates.")
 
 
+
+def filter_reports(rows):
+    cutoff=datetime.now(UTC)-timedelta(hours=age)
+    return [r for r in rows if r.get("published") and datetime.fromisoformat(r["published"])>=cutoff
+        and (not search.strip() or search.casefold() in (r["title"]+" "+r.get("summary","")).casefold())]
+
+
+def report_context(item):
+    title=item["title"].casefold()
+    if re.match(r"^(opinion|editorial)\s*[:|\-]",title):return "Opinion · labelled in headline"
+    if re.match(r"^analysis\s*[:|\-]",title):return "Analysis · labelled in headline"
+    host=urlparse(item["url"]).hostname or ""
+    if host.endswith((".gov",".gov.uk",".gov.mt",".gov.br",".europa.eu")):
+        return "Official-domain publication · statement remains attributed"
+    return "Publisher reporting · claims remain attributed"
+
+
+def render_timeline(rows):
+    dated=sorted((r for r in rows if r.get("published")),key=lambda r:datetime.fromisoformat(r["published"]))
+    unique={}
+    for report in dated:unique.setdefault(report_key(report),report)
+    st.caption("Publication timeline · oldest to newest · source claims can differ; publication time is not necessarily event time")
+    if not unique:st.info("No dated reports available for this timeline.")
+    for report in unique.values():
+        with st.container(border=True):
+            st.markdown("**"+timestamp(report["published"])+" · "+report["source"]+"**")
+            st.write(report["title"])
+            st.caption(report_context(report))
+            if report.get("summary"):st.write(short_preview(report["summary"],85))
+            st.link_button("OPEN SOURCE ↗",report["url"])
+
+
+@st.dialog("REPORT TIMELINE",width="large")
+def timeline_dialog(group):
+    st.markdown(f'<div class="brief-title">{escape(group[0]["title"])}</div>',unsafe_allow_html=True)
+    with st.container(key="brief_scroll",border=False):render_timeline(group)
+
+
+def timeline_page(items):
+    st.subheader("EVENT TIMELINES")
+    st.caption("Related reporting grouped by headline similarity · use source links to assess the underlying claims")
+    groups=group_reporting(items)
+    if not groups:
+        st.info("No reporting matches the current filters.");return
+    selection=st.selectbox("Choose a developing story",list(range(len(groups))),format_func=lambda i:f'{len(groups[i])} report(s) · {groups[i][0]["title"]}',key="event_story")
+    render_timeline(groups[selection])
+
+
+VIDEO_CHANNELS={"BBC News":"UC16niRr50-MSBwiO3YDb3RA","Reuters":"UChqUTb7kYRX8-EiaN3XFrSQ"}
+
+
+def videos_from_channel_page(html,publisher):
+    match=re.search(r"(?:var\s+)?ytInitialData\s*=\s*",html)
+    if not match:return []
+    try:data,_=json.JSONDecoder().raw_decode(html[match.end():])
+    except (ValueError,TypeError):return []
+    stack=[data];rows=[];seen=set()
+    while stack and len(rows)<30:
+        node=stack.pop()
+        if isinstance(node,dict):
+            video=node.get("videoRenderer")
+            lockup=node.get("lockupViewModel")
+            if not isinstance(video,dict) and isinstance(lockup,dict):
+                title=lockup.get("metadata",{}).get("lockupMetadataViewModel",{}).get("title",{}).get("content","")
+                relative=re.search(r"\b\d+\s+(?:seconds?|minutes?|hours?|days?|weeks?|months?|years?) ago\b",json.dumps(lockup.get("metadata",{})),re.I)
+                video={"videoId":lockup.get("contentId",""),"title":{"simpleText":title},"publishedTimeText":{"simpleText":relative.group(0) if relative else ""}}
+            if isinstance(video,dict):
+                video_id=video.get("videoId","")
+                title="".join(r.get("text","") for r in video.get("title",{}).get("runs",[])) or video.get("title",{}).get("simpleText","")
+                if re.fullmatch(r"[A-Za-z0-9_-]{11}",video_id) and title and video_id not in seen:
+                    seen.add(video_id)
+                    relative=video.get("publishedTimeText",{}).get("simpleText","")
+                    rows.append(dict(title=clean(title),source=publisher+" · YouTube",category="Videos",url="https://www.youtube.com/watch?v="+video_id,summary="",published=None,published_label=clean(relative),fetched_at=datetime.now(UTC).isoformat()))
+            stack.extend(reversed(list(node.values())))
+        elif isinstance(node,list):stack.extend(reversed(node))
+    return rows
+
+
+@st.cache_data(ttl=300,show_spinner=False)
+def publisher_videos(publisher):
+    rows,error=fetch_feed("Videos",publisher+" · YouTube", "https://www.youtube.com/feeds/videos.xml?channel_id="+VIDEO_CHANNELS[publisher])
+    if rows:return rows,None
+    try:
+        handle={"BBC News":"BBCNews","Reuters":"Reuters"}[publisher]
+        response=requests.get("https://www.youtube.com/@"+handle+"/videos",headers=HEADERS,timeout=12)
+        response.raise_for_status()
+        rows=videos_from_channel_page(response.text[:3000000],publisher)
+        if rows:return rows,None
+    except Exception:pass
+    return [],error or publisher+": video listing unavailable"
+
+
+@st.dialog("PUBLISHER VIDEO",width="large")
+def video_dialog(item):
+    st.markdown(f'<div class="brief-title">{escape(item["title"])}</div>',unsafe_allow_html=True)
+    st.caption(item["source"]+" · "+timestamp(item["published"]))
+    st.video(item["url"])
+    st.link_button("WATCH AT SOURCE ↗",item["url"])
+    st.caption("Playback depends on publisher permissions and regional availability. No autoplay.")
+
+
+def videos_panel(country_code=None):
+    st.subheader("VIDEO BRIEFINGS")
+    publisher=st.radio("PUBLISHER",["All"]+list(VIDEO_CHANNELS),horizontal=True,key="video_publisher_"+str(country_code))
+    chosen=list(VIDEO_CHANNELS) if publisher=="All" else [publisher]
+    with ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(publisher_videos,chosen))
+    rows=[]
+    for reports,error in results:
+        if error:st.caption(error)
+    for index in range(max((len(reports) for reports,error in results),default=0)):
+        for reports,error in results:
+            if index<len(reports):rows.append(reports[index])
+    dated=filter_reports([r for r in rows if r.get("published")])
+    undated=[r for r in rows if not r.get("published") and (not search.strip() or search.casefold() in r["title"].casefold())]
+    rows=list({report_key(r):r for r in dated+undated}.values())
+    if country_code:
+        rows=[r for r in rows if country_code in country_mentions(r["title"]+" "+r.get("summary",""),country_catalog())]
+    rows.sort(key=lambda r:r.get("published") or "",reverse=True)
+    st.caption("Latest clips from the listed publisher channels · country matching uses titles/summaries · play only when selected. Undated channel-page clips may fall outside the selected story window.")
+    if not rows:st.info("No matching clips in the latest retrieved channel uploads. Publisher channel links remain available below.")
+    for offset in range(0,min(12,len(rows)),2):
+        for col,item in zip(st.columns(2),rows[offset:offset+2]):
+            with col,st.container(border=True):
+                video_id=dict(parse_qsl(urlparse(item["url"]).query)).get("v","")
+                if re.fullmatch(r"[A-Za-z0-9_-]{11}",video_id):st.image("https://i.ytimg.com/vi/"+video_id+"/hqdefault.jpg",use_container_width=True)
+                st.write(item["title"])
+                st.caption(item["source"]+" · "+(item.get("published_label") or timestamp(item["published"])))
+                if st.button("▶ PLAY VIDEO",key="play_"+str(country_code)+"_"+hashlib.sha256(item["url"].encode()).hexdigest()[:16],use_container_width=True):video_dialog(item)
+    for name in chosen:st.link_button(name+" / CHANNEL ↗","https://www.youtube.com/channel/"+VIDEO_CHANNELS[name])
+
+
+CRYPTO_DEFAULTS={"Bitcoin":"BTC","Ethereum":"ETH","Solana":"SOL","XRP":"XRP"}
+CRYPTO_PRESETS={**CRYPTO_DEFAULTS,"Cardano":"ADA","Dogecoin":"DOGE","BNB":"BNB","Chainlink":"LINK","Avalanche":"AVAX","Litecoin":"LTC"}
+
+
+@st.cache_data(ttl=300,show_spinner=False,max_entries=100)
+def crypto_history(symbol,period):
+    try:
+        settings={"1D":("1d","15m",None),"1W":("1mo","1h",7),"1M":("1mo","1d",None),"1Y":("1y","1d",None)}
+        window,interval,days=settings[period]
+        ticker=yf.Ticker(symbol)
+        data=ticker.history(period=window,interval=interval,auto_adjust=False,timeout=12)
+        if data.empty:return None
+        frame=data.dropna(subset=["Close"]).reset_index()
+        frame.rename(columns={"Datetime":"Date"},inplace=True)
+        frame=frame[[c for c in ["Date","Open","High","Low","Close"] if c in frame]]
+        if days:
+            cutoff=pd.Timestamp.now(tz="UTC")-pd.Timedelta(days=days)
+            frame=frame[pd.to_datetime(frame["Date"],utc=True)>=cutoff].copy()
+        frame.attrs["fetched_at"]=datetime.now(UTC).isoformat()
+        return frame if not frame.empty else None
+    except Exception:return None
+
+
+@st.cache_data(ttl=900,show_spinner=False)
+def crypto_global(currency):
+    try:
+        r=requests.get("https://api.coingecko.com/api/v3/global",headers=HEADERS,timeout=10);r.raise_for_status()
+        data=r.json()["data"];key=currency.casefold()
+        return dict(cap=float(data["total_market_cap"][key]),volume=float(data["total_volume"][key]),dominance=float(data["market_cap_percentage"]["btc"]),updated=data.get("updated_at")),None
+    except Exception:return None,"Global crypto statistics unavailable or rate-limited on this check."
+
+
+@st.dialog("CRYPTO CHART",width="large")
+def crypto_dialog(name,symbol,currency,frame,period):
+    st.subheader(name.upper()+" / "+currency)
+    fig=price_figure(frame,currency)
+    if period=="1D":fig.update_xaxes(tickformat="%H:%M");fig.update_traces(hovertemplate="%{x|%d %b %H:%M}<br>%{y:,.4f} "+currency+"<extra></extra>",selector=dict(type="scatter"))
+    st.plotly_chart(fig,use_container_width=True,key="crypto_detail_"+symbol)
+    st.caption("Yahoo Finance · "+period+" · latest observation "+str(frame["Date"].iloc[-1])+" · prices may be delayed")
+    st.link_button("PRICE SOURCE ↗","https://finance.yahoo.com/quote/"+quote(symbol,safe="")+"/")
+
+
+def crypto_page(items):
+    st.subheader("CRYPTO / MARKET MONITOR")
+    currency_col,period_col=st.columns([1,3])
+    currency=currency_col.selectbox("Currency",["USD","EUR"],key="crypto_currency",label_visibility="collapsed")
+    period=period_col.radio("Chart range",["1D","1W","1M","1Y"],horizontal=True,index=2,key="crypto_period",label_visibility="collapsed")
+    summary,error=crypto_global(currency)
+    if summary:
+        with st.container(key="overview_kpis"):
+            cap,volume,dominance=st.columns(3)
+            cap.metric("TOTAL MARKET CAP",f'{summary["cap"]/1e12:,.2f}T {currency}')
+            volume.metric("24H TRADING VOLUME",f'{summary["volume"]/1e9:,.2f}B {currency}')
+            dominance.metric("BITCOIN DOMINANCE",f'{summary["dominance"]:.1f}%')
+        stamp=datetime.fromtimestamp(summary["updated"],UTC).strftime("%d %b %H:%M UTC") if summary.get("updated") else "Timestamp unavailable"
+        st.caption("CoinGecko aggregate statistics · "+stamp+" · cached up to 15 minutes")
+    else:st.caption(error)
+    st.link_button("GLOBAL DATA / COINGECKO ↗","https://www.coingecko.com/en/global-charts")
+    st.session_state.setdefault("crypto_added",{})
+    with st.form("crypto_search_form",border=False):
+        field,button=st.columns([5,1]);query=field.text_input("Find cryptocurrency",placeholder="Search cryptocurrency name or ticker…",label_visibility="collapsed")
+        submitted=button.form_submit_button("SEARCH",use_container_width=True)
+    if submitted:
+        matches,error=company_search(query.strip()) if query.strip() else ([],None)
+        st.session_state.crypto_results=[r for r in matches if r["kind"]=="CRYPTOCURRENCY" and r["symbol"].endswith(("-USD","-EUR"))]
+        if error:st.caption(error)
+    if st.session_state.get("crypto_results"):
+        match=st.selectbox("Search results",st.session_state.crypto_results,format_func=lambda r:r["name"]+" · "+r["symbol"],key="crypto_search_result")
+        if st.button("ADD TO CRYPTO WATCHLIST",key="crypto_add"):
+            base=match["symbol"].rsplit("-",1)[0];label=match["name"].removesuffix(" USD").removesuffix(" EUR")
+            st.session_state.crypto_added[label]=base
+            current=st.session_state.get("crypto_choices",st.session_state.get("crypto_selection",list(CRYPTO_DEFAULTS)))
+            st.session_state.crypto_choices=list(dict.fromkeys(current+[label]))
+    elif submitted:st.caption("No matching supported cryptocurrency listings returned.")
+    registry={**CRYPTO_PRESETS,**st.session_state.crypto_added}
+    with st.expander("EDIT CRYPTO WATCHLIST"):
+        names=st.multiselect("Coins",list(registry),default=st.session_state.get("crypto_selection",list(CRYPTO_DEFAULTS)),key="crypto_choices")
+    st.session_state.crypto_selection=list(names)
+    unique_names=[];seen_symbols=set()
+    for name in names:
+        if registry[name] not in seen_symbols:
+            unique_names.append(name);seen_symbols.add(registry[name])
+    names=unique_names
+    symbols=[registry[name]+"-"+currency for name in names]
+    with ThreadPoolExecutor(max_workers=4) as pool:frames=list(pool.map(lambda symbol:crypto_history(symbol,period),symbols))
+    for offset in range(0,len(names),4):
+        for col,name,symbol,frame in zip(st.columns(4),names[offset:offset+4],symbols[offset:offset+4],frames[offset:offset+4]):
+            with col,st.container(border=True):
+                if frame is None or frame.empty:
+                    st.metric(name,"Unavailable");st.caption(symbol+" · no substitute quote shown");continue
+                first,last=float(frame["Close"].iloc[0]),float(frame["Close"].iloc[-1])
+                change=(last/first-1)*100 if first else None
+                st.metric(name,display_price(last,currency),f"{change:+.2f}% / {period}" if change is not None else None)
+                fig=price_figure(frame,currency,compact=True);fig.update_layout(height=135)
+                if period=="1D":fig.update_xaxes(tickformat="%H:%M")
+                if period in ("1D","1W"):
+                    fig.update_traces(hovertemplate="%{x|%d %b %H:%M}<br>%{y:,.4f} "+currency+"<extra></extra>",selector=dict(type="scatter"))
+                st.plotly_chart(fig,use_container_width=True,key="crypto_card_"+symbol,config={"displayModeBar":False})
+                st.caption("Observation "+pd.Timestamp(frame["Date"].iloc[-1]).strftime("%d %b %H:%M %Z"))
+                if st.button("EXPAND ↗",key="crypto_expand_"+symbol,use_container_width=True):crypto_dialog(name,symbol,currency,frame,period)
+    st.caption("Yahoo Finance · prices may be delayed · changes compare first/last observations in the selected range; 1D is the provider’s current day, not a rolling 24h return")
+    st.subheader("CRYPTO / REGULATION & DEVELOPMENTS")
+    focus=st.radio("CRYPTO NEWS FOCUS",["All","Regulation","Exchange incidents","Institutions"],horizontal=True,key="crypto_news_focus")
+    filters={"Regulation":r"regulat|law|court|sec\b|legislat|ban\b", "Exchange incidents":r"exchange|hack|breach|outage|fraud|stolen", "Institutions":r"bank|fund|etf\b|institution|treasur|corporat"}
+    reports=items if focus=="All" else [r for r in items if re.search(filters[focus],r["title"]+" "+r.get("summary",""),re.I)]
+    grouped_news(reports,"crypto_news",12)
+
+
+def grouped_news(rows,scope,limit=12):
+    groups=group_reporting(rows)
+    if not groups:st.info("No matching reports in the selected story window.")
+    for offset in range(0,min(limit,len(groups)),3):
+        for index,(col,group) in enumerate(zip(st.columns(3),groups[offset:offset+3]),start=offset):
+            item=group[0]
+            with col,st.container(border=True):
+                st.markdown(f'<div class="sport-headline">{escape(item["title"])}</div>',unsafe_allow_html=True)
+                st.caption(item["source"]+" · "+timestamp(item["published"]))
+                st.caption(report_context(item))
+                if item.get("summary"):st.write(short_preview(item["summary"],45))
+                if st.button("OPEN BRIEF",key=f"group_{scope}_{index}",use_container_width=True):story_dialog(item)
+                st.link_button("SOURCE ↗",item["url"])
+                related_reports(group,scope=scope+str(index))
+
+
+def my_briefing(items):
+    st.subheader("MY BRIEFING")
+    catalog=country_catalog();ordered=sorted(catalog,key=lambda code:catalog[code]["name"])
+    topics={"Diplomacy & policy":r"diploma|sanction|policy|treaty|legislat", "Economy & energy":r"econom|inflation|central bank|oil|energy|trade", "Elections":ELECTION_WORDS, "Conflicts":CONFLICT_WORDS, "Crypto":r"bitcoin|ethereum|crypto", "Sports":r"football|tennis|basketball|sport"}
+    profile=st.session_state.get("user_interests",{})
+    with st.expander("YOUR INTERESTS",expanded=True):
+        countries=st.multiselect("Countries",ordered,format_func=lambda code:catalog[code]["name"],default=profile.get("countries",[]),max_selections=6,key="_briefing_countries")
+        chosen=st.multiselect("Topics",list(topics),default=profile.get("topics",[]),key="_briefing_topics")
+        words=st.text_area("Companies or keywords — one per line",value=profile.get("keywords",""),placeholder="Add your own interests…",key="_briefing_keywords")
+        st.caption("Blank by default · stored only during this browser session · matches any selected country, topic or keyword within retrieved feeds")
+    st.session_state.user_interests=dict(countries=list(countries),topics=list(chosen),keywords=words)
+    keywords=[w.strip().casefold() for w in words.splitlines() if w.strip()][:20]
+    if not (countries or chosen or keywords):
+        st.info("Choose an interest above to build your briefing.");return
+    selected=[]
+    for item in items:
+        text=item["title"]+" "+item.get("summary","")
+        if (countries and set(countries)&set(country_mentions(text,catalog))) or any(re.search(topics[t],text,re.I) for t in chosen) or any(w in text.casefold() for w in keywords):selected.append(item)
+    st.caption("Coverage is limited to the connected feeds; search and story-window filters also apply.")
+    grouped_news(selected,"personal_briefing",18)
+
+
 def refresh_page_data(page, country_open=False):
     if page=="Overview" and country_open:
         country_news.clear()
+        publisher_videos.clear()
+        elections_calendar.clear()
         feed_snapshot.clear()
         return
-    if page in ("Overview","World","Politics","Conflicts","Elections","Sports","US Elections","Sources"):
+    if page in ("Overview","World","Politics","Conflicts","Elections","Sports","US Elections","Sources","Crypto","Timelines","My Briefing","Videos"):
         feed_snapshot.clear()
     if page in ("Overview","Markets","Commodities"):
         market_data.clear()
@@ -1454,15 +1789,20 @@ def refresh_page_data(page, country_open=False):
         elections_calendar.clear()
     if page=="Markets":
         company_search.clear()
+    if page=="Crypto":
+        crypto_history.clear()
+        crypto_global.clear()
+    if page=="Videos":
+        publisher_videos.clear()
 
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-02")
-    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
+    st.caption("REVISION 2026.10.22-03")
+    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Timelines", "My Briefing", "Videos", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
-    auto = st.toggle("Automatic refresh", value=True, help="News: 3 minutes · market pages: 10 minutes · election calendar: 6-hour cache")
+    auto = st.toggle("Automatic refresh", value=True, help="News: 3 minutes · crypto/video: 5 minutes · market pages: 10 minutes · calendar: 6-hour cache")
     if st.button("REFRESH PAGE DATA", use_container_width=True):
         refresh_page_data(section,bool(st.session_state.get("monitor_country")))
 
@@ -1475,7 +1815,7 @@ else:
     st.markdown('<div class="mini-brand">◈ INTELLIGENCE HUB</div>', unsafe_allow_html=True)
 
 
-refresh_interval = "600s" if section in ("Markets","Commodities") else "180s"
+refresh_interval = "600s" if section in ("Markets","Commodities") else "300s" if section in ("Crypto","Videos") else "180s"
 
 
 @st.fragment(run_every=refresh_interval if auto else None)
@@ -1511,6 +1851,15 @@ def dashboard():
             if currency == "EUR":
                 st.caption("EUR uses historical daily EUR/USD closes. Converted candles are estimates; unmatched exchange-rate observations are omitted.")
                 st.link_button("EUR/USD SOURCE ↗", "https://finance.yahoo.com/quote/EURUSD%3DX/")
+    elif section == "Crypto":
+        with st.container(key="markets_compact_page"):
+            crypto_page(items)
+    elif section == "Timelines":
+        timeline_page(items)
+    elif section == "My Briefing":
+        my_briefing(items)
+    elif section == "Videos":
+        videos_panel()
     elif section == "Sports":
         with st.container(key="sports_desk"):
             sports_panel()
