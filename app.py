@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from html import escape, unescape
@@ -1222,10 +1223,15 @@ def country_catalog():
     return {c.alpha_3: {"name": c.name, "aliases": COUNTRY_ALIASES.get(c.alpha_3, list(dict.fromkeys([c.name, getattr(c,"common_name",c.name),getattr(c,"official_name",c.name)])))} for c in pycountry.countries}
 
 
+@lru_cache(maxsize=2048)
+def country_alias_pattern(alias):
+    return re.compile(r"(?<!\w)"+re.escape(alias)+r"(?!\w)",re.I if alias != "US" else 0)
+
+
 def country_mentions(text, catalog):
     found=[]
     for code, country in catalog.items():
-        if any(re.search(r"(?<!\w)"+re.escape(alias)+r"(?!\w)",text,re.I if alias != "US" else 0) for alias in country["aliases"]):
+        if any(country_alias_pattern(alias).search(text) for alias in country["aliases"]):
             found.append(code)
     # Do not count a South Sudan mention as Sudan unless Sudan occurs separately.
     if "SSD" in found and not re.search(r"(?<!South )\bSudan\b",text,re.I):
@@ -1328,21 +1334,21 @@ def map_highlight(conflict,election,coverage):
 
 
 @st.cache_resource
-def globe_component():
+def globe_component(markup):
     import tempfile
     from pathlib import Path
     from streamlit.components.v1 import declare_component
     directory=Path(tempfile.mkdtemp(prefix="intel_globe_"))
-    (directory/"index.html").write_text(GLOBE_HTML,encoding="utf-8")
-    return declare_component("intel_globe",path=str(directory))
+    (directory/"index.html").write_text(markup,encoding="utf-8")
+    return declare_component("intel_globe_"+hashlib.sha256(markup.encode()).hexdigest()[:10],path=str(directory))
 
 
-GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}svg{display:block;width:100%;touch-action:none;cursor:grab}svg:active{cursor:grabbing}#tip{position:absolute;top:5px;left:5px;pointer-events:none;background:#0c1c2af5;padding:10px;border-radius:5px;border:1px solid #31566a;box-shadow:0 5px 20px #0005;width:238px;max-width:calc(100% - 10px);max-height:278px;overflow:hidden;box-sizing:border-box;font-size:10px;line-height:1.4;z-index:2}#tip strong{font-size:13px;color:#dceef9;display:block;letter-spacing:.7px}#tip .eyebrow{font-size:9px;letter-spacing:1px;margin-bottom:4px}#tip .detail{color:#9ab0c0;margin:4px 0}#tip .headline{border-top:1px solid #294354;margin-top:6px;padding-top:5px;color:#d5e4ee}#tip .bars{display:flex;height:22px;align-items:flex-end;gap:3px;margin-top:5px}#tip .bar{flex:1;min-height:2px;opacity:.75}#tip .foot{font-size:9px;color:#849eaf;margin-top:5px}#help{text-align:center;font-size:11px;color:#8299ab}</style></head><body><div id="tip">Hover to inspect · drag to rotate</div><svg aria-label="Interactive world globe" role="img"></svg><div id="help">Country search above also opens any briefing</div><script>
+GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}svg{display:block;width:100%;height:258px;touch-action:none;cursor:grab}svg:active{cursor:grabbing}#tip{position:absolute;top:5px;left:5px;pointer-events:none;background:#0c1c2af5;padding:10px;border-radius:5px;border:1px solid #31566a;box-shadow:0 5px 20px #0005;width:238px;max-width:calc(100% - 10px);max-height:246px;overflow:auto;box-sizing:border-box;font-size:10px;line-height:1.4;z-index:2}#tip strong{font-size:13px;color:#dceef9;display:block;letter-spacing:.7px}#tip .eyebrow{font-size:9px;letter-spacing:1px;margin-bottom:4px}#tip .detail{color:#9ab0c0;margin:4px 0}#tip .headline{border-top:1px solid #294354;margin-top:6px;padding-top:5px;color:#d5e4ee}#tip .bars{display:flex;height:22px;align-items:flex-end;gap:3px;margin-top:5px}#tip .bar{flex:1;min-height:2px;opacity:.75}#tip .foot{font-size:9px;color:#849eaf;margin-top:5px}#help{text-align:center;font-size:11px;color:#8299ab}</style></head><body><div id="tip">Hover to inspect · drag to rotate</div><svg aria-label="Interactive world globe" role="img"></svg><div id="help">Country search above also opens any briefing</div><script>
 const send=(type,extra={})=>parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
-send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:320});
+send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:278});
 const tip=document.getElementById('tip');
 function resetIntel(){tip.replaceChildren();tip.textContent='Hover to inspect · click for country briefing';tip.style.left='5px';tip.style.top='5px';}
-function positionIntel(e){const w=document.body.clientWidth,h=292;let x=e.clientX+12;if(x+tip.offsetWidth>w-5)x=e.clientX-tip.offsetWidth-12;x=Math.max(5,Math.min(x,w-tip.offsetWidth-5));tip.style.left=x+'px';tip.style.top=Math.max(5,Math.min(e.clientY+8,h-tip.offsetHeight-5))+'px';}
+function positionIntel(e){const w=document.body.clientWidth,h=258;let x=e.clientX+12;if(x+tip.offsetWidth>w-5)x=e.clientX-tip.offsetWidth-12;x=Math.max(5,Math.min(x,w-tip.offsetWidth-5));tip.style.left=x+'px';tip.style.top=Math.max(5,Math.min(e.clientY+8,h-tip.offsetHeight-5))+'px';}
 function showIntel(e,d){
  const info=d.properties.intel||{},focus=info.focus||'All',tone=focus==='Conflicts'?'#ca6976':focus==='Elections'?'#c7a15d':'#40e0d0';tip.replaceChildren();
  const add=(tag,text,cls)=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;tip.appendChild(el);return el;};
@@ -1358,16 +1364,14 @@ function showIntel(e,d){
   info.bars.forEach((v,i)=>{const bar=document.createElement('span');bar.className='bar';bar.style.height=Math.max(2,v/max*22)+'px';bar.style.background=tone;bar.title=info.barDates[i]+': '+v+' reports';chart.appendChild(bar);});
   add('div',info.barDates[0]+' — '+info.barDates[6]+' · selected window only','foot');
  }
- (info.headlines||[]).forEach(r=>{add('div',r.title,'headline');add('div',r.source+' · '+r.time,'foot');});
+ (info.headlines||[]).slice(0,focus==='Elections'?1:2).forEach(r=>{add('div',r.title,'headline');add('div',r.source+' · '+r.time,'foot');});
  if(!(info.headlines||[]).length)add('div','No matching retrieved headlines','detail');
  add('div','Click country to open full briefing','foot');positionIntel(e);
 }
 let args,rotation=[-15,-20],draw,lastRegion;
 addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;if(args.region!==lastRegion){rotation=[-args.center[1],-args.center[0]];lastRegion=args.region;}
 if(!window.d3){document.getElementById('tip').textContent='Globe unavailable — use Flat map or country search';return;}
-const width=document.body.clientWidth,height=292,r=Math.min(width/2-18,136),svg=d3.select('svg').attr('viewBox',`0 0 ${width} ${height}`);svg.selectAll('*').remove();
-for(let x=20;x<width;x+=40)svg.append('line').attr('x1',x).attr('x2',x).attr('y1',10).attr('y2',height-10).attr('stroke','#1e3e4e').attr('stroke-width',.35).attr('opacity',.35);
-for(let y=26;y<height;y+=40)svg.append('line').attr('x1',10).attr('x2',width-10).attr('y1',y).attr('y2',y).attr('stroke','#1e3e4e').attr('stroke-width',.35).attr('opacity',.35);
+const width=document.body.clientWidth,height=258,r=Math.min(width/2-18,116),svg=d3.select('svg').attr('viewBox',`0 0 ${width} ${height}`);svg.selectAll('*').remove();
 const projection=d3.geoOrthographic().translate([width/2,height/2]).scale(r).rotate(rotation).clipAngle(90),path=d3.geoPath(projection);
 const defs=svg.append('defs'),grad=defs.append('radialGradient').attr('id','ocean');grad.append('stop').attr('offset','0%').attr('stop-color','#13394b');grad.append('stop').attr('offset','100%').attr('stop-color','#071420');
 svg.append('circle').attr('cx',width/2).attr('cy',height/2).attr('r',r+5).attr('fill','none').attr('stroke','#29bdb655').attr('stroke-width',3);
@@ -1446,8 +1450,8 @@ def compact_pulse():
     st.caption("MARKET PULSE · delayed daily quotes",help="Yahoo Finance daily closes · 1M sparklines · metals/oil futures · gold/silver EUR per gram, oil EUR per barrel · EUR estimates use historical daily FX. Hover a quote for its source date; open Markets or Commodities for full charts.")
 
 
-def country_hover_details(code,items,election_rows,catalog,layer):
-    matches=[item for item in monitor_reports(items,layer) if code in country_mentions(item.get("title","")+" "+item.get("summary",""),catalog)]
+def country_hover_details(code,items,election_rows,catalog,layer,already_matched=False):
+    matches=list(items) if already_matched else [item for item in monitor_reports(items,layer) if code in country_mentions(item.get("title","")+" "+item.get("summary",""),catalog)]
     matches=sorted(matches,key=lambda row:row.get("published") or "",reverse=True)
     today=datetime.now(UTC).date()
     days=[today-timedelta(days=i) for i in range(6,-1,-1)]
@@ -1475,10 +1479,12 @@ def world_monitor(items):
         for code in favourites:
             if st.button("★ "+catalog[code]["name"],key="favourite_country_"+code,use_container_width=True):open_country(code)
     counts={}
+    hover_by_country={}
     conflict_counts,election_counts={},{}
     for item in monitor_reports(items,layer):
         text=item["title"]+" "+item["summary"]
         for code in country_mentions(text,catalog):
+            hover_by_country.setdefault(code,[]).append(item)
             counts[code]=counts.get(code,0)+1
             if re.search(CONFLICT_WORDS,text,re.I):
                 conflict_counts[code]=conflict_counts.get(code,0)+1
@@ -1498,19 +1504,16 @@ def world_monitor(items):
         color="#ca6976" if layer=="Conflicts" else "#c7a15d" if layer=="Elections" else "#40e0d0"
         regions={"World":([22,10],2),"Europe":([52,15],4),"Middle East":([30,43],4),"Americas":([15,-80],3),"Asia-Pacific":([24,115],3),"Africa":([1,20],3)}
         center,zoom=regions[region]
-        m=folium.Map(location=center,zoom_start=zoom,min_zoom=1,max_zoom=7,tiles=None,control_scale=True,prefer_canvas=True,scrollWheelZoom=False)
-        from folium.plugins import Fullscreen
-        Fullscreen(position="topright",title="Full-screen map",title_cancel="Exit full screen").add_to(m)
-        m.get_root().header.add_child(folium.Element("<style>.leaflet-container{background:#070d17!important}.leaflet-tooltip{background:#101c2c;color:#dce9f5;border:1px solid #426275;font:12px monospace}</style>"))
-        for latitude in range(-60,90,30):
-            folium.PolyLine([[latitude,-180],[latitude,180]],color="#183040",weight=.5,opacity=.6,interactive=False).add_to(m)
-        for longitude in range(-180,181,30):
-            folium.PolyLine([[-80,longitude],[85,longitude]],color="#183040",weight=.5,opacity=.6,interactive=False).add_to(m)
+        if map_view=="Flat map":
+            m=folium.Map(location=center,zoom_start=zoom,min_zoom=1,max_zoom=7,tiles=None,control_scale=True,prefer_canvas=True,scrollWheelZoom=False)
+            from folium.plugins import Fullscreen
+            Fullscreen(position="topright",title="Full-screen map",title_cancel="Exit full screen").add_to(m)
+            m.get_root().header.add_child(folium.Element("<style>.leaflet-container{background:#070d17!important}.leaflet-tooltip{background:#101c2c;color:#dce9f5;border:1px solid #426275;font:12px monospace}</style>"))
+            for latitude in range(-60,90,30):
+                folium.PolyLine([[latitude,-180],[latitude,180]],color="#183040",weight=.5,opacity=.6,interactive=False).add_to(m)
+            for longitude in range(-180,181,30):
+                folium.PolyLine([[-80,longitude],[85,longitude]],color="#183040",weight=.5,opacity=.6,interactive=False).add_to(m)
         features=[]
-        focused_items=monitor_reports(items,layer)
-        hover_by_country={}
-        for report in focused_items:
-            for code in country_mentions(report.get("title","")+" "+report.get("summary",""),catalog):hover_by_country.setdefault(code,[]).append(report)
         for original in data["features"]:
             f=dict(original)
             props=dict(f["properties"])
@@ -1526,17 +1529,18 @@ def world_monitor(items):
             props["fill"]=("#ca6976" if conflict else "#102537") if layer=="Conflicts" else ("#c7a15d" if election else "#102537") if layer=="Elections" else map_highlight(conflict,election,props["Articles"])
             dates=election_countdowns(elections.get(code,[]))
             props["Next national vote"]=f'{dates[0]["Date"]} · {dates[0]["Days to vote"]} days' if dates else "No calendar entry"
-            props["intel"]=country_hover_details(code,hover_by_country.get(code,[]),elections.get(code,[]),catalog,layer)
+            props["intel"]=country_hover_details(code,hover_by_country.get(code,[]),elections.get(code,[]),catalog,layer,already_matched=True)
             f["properties"]=props
             features.append(f)
         boundaries={"type":"FeatureCollection","features":features}
-        folium.GeoJson(boundaries,name="Countries",style_function=lambda f:{"fillColor":f["properties"]["fill"],"color":"#426275","weight":.6,"fillOpacity":.32 if f["properties"]["highlight"] else .10},highlight_function=lambda f:{"weight":2,"color":"#8cffff","fillOpacity":.7},tooltip=folium.GeoJsonTooltip(fields=["Country","Articles","Calendar elections","Next national vote"],aliases=["Country","Retrieved articles","Upcoming calendar entries","Next national vote"],sticky=False),embed=True).add_to(m)
+
         if map_view=="Globe":
-            result=globe_component()(features=features,region=region,center=center,key="overview_globe",default=None)
+            result=globe_component(GLOBE_HTML)(features=features,region=region,center=center,key="overview_globe",default=None)
             if result and result.get("nonce")!=st.session_state.get("globe_last_nonce"):
                 st.session_state.globe_last_nonce=result.get("nonce")
                 if result.get("code") in catalog:open_country(result["code"])
         else:
+            folium.GeoJson(boundaries,name="Countries",style_function=lambda f:{"fillColor":f["properties"]["fill"],"color":"#426275","weight":.6,"fillOpacity":.32 if f["properties"]["highlight"] else .10},highlight_function=lambda f:{"weight":2,"color":"#8cffff","fillOpacity":.7},tooltip=folium.GeoJsonTooltip(fields=["Country","Articles","Calendar elections","Next national vote"],aliases=["Country","Retrieved articles","Upcoming calendar entries","Next national vote"],sticky=False),embed=True).add_to(m)
             result=st_folium(m,height=330,use_container_width=True,key="world_map_"+layer+"_"+region,returned_objects=["last_clicked"])
             click=result.get("last_clicked") if result else None
             fingerprint=(layer,click.get("lat"),click.get("lng")) if click else None
@@ -1631,7 +1635,8 @@ def overview_panel(items, errors, change_items=None):
     now=datetime.now(UTC)
     st.markdown('<div class="ops-strip"><span><span class="ops-dot"></span><strong>GLOBAL SITUATION DESK</strong> / '+escape(st.session_state.get("news_scope","Major developments").upper())+'</span><span>'+now.strftime("%d %b %Y · %H:%M UTC")+' / '+now.astimezone(ZoneInfo("Europe/Malta")).strftime("%H:%M MALTA")+'</span></div>',unsafe_allow_html=True)
     overview_changes(items if change_items is None else change_items,items)
-    compact_pulse()
+    with st.container(key="overview_pulse_tight"):
+        compact_pulse()
     with st.container(key="explore_desks"):
         st.markdown('<span class="desk-label">EXPLORE DESKS</span>',unsafe_allow_html=True)
         for col,channel in zip(st.columns(6),["World","Politics","Conflicts","Elections","Economic Calendar","Markets"]):
@@ -2011,7 +2016,7 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-09")
+    st.caption("REVISION 2026.10.22-10")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"],key="channel")
     news_scope=st.selectbox("NEWS COVERAGE",["Major developments","All reporting"],key="news_scope",help="Keyword-based filter for policy, elections, conflicts and major economic developments. Sports keeps its own coverage. Choose All reporting for broader coverage.")
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
@@ -2022,6 +2027,7 @@ with st.sidebar:
 
 
 if section == "Overview":
+    st.markdown('<style>[data-testid="stMainBlockContainer"],.block-container{padding-top:2.8rem!important}[data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"]{gap:.5rem!important}.ticker-strip{margin-top:0}.ticker-cell{padding:5px 10px}.ticker-value{font-size:14px}.ticker-bottom svg{height:16px;width:50px}.overview-title{margin:2px 0 5px}.ops-strip{margin-bottom:2px}.st-key-overview_pulse_tight [data-testid="stVerticalBlock"],.st-key-explore_desks{gap:3px!important}.st-key-overview_command{padding-top:8px}.st-key-overview_pulse_tight [data-testid="stCaptionContainer"]{font-size:10px!important}</style>',unsafe_allow_html=True)
     st.markdown('<div class="tag">GLOBAL OPERATIONS / OPEN-SOURCE INTELLIGENCE</div>', unsafe_allow_html=True)
     st.markdown('<div class="overview-title">INTELLIGENCE HUB <span>WORLD / POLICY / CONFLICT / ECONOMY</span></div>',unsafe_allow_html=True)
 else:
