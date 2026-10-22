@@ -1720,6 +1720,10 @@ def refresh_page_data(page, country_open=False):
 
 
 # Apply the new defaults once per session, then honour subsequent user changes.
+if not st.session_state.get("grams_default_20261022_05"):
+    st.session_state.metal_weight="Grams"
+    st.session_state.grams_default_20261022_05=True
+
 if not st.session_state.get("eur_defaults_20261022_04"):
     for currency_key in ("market_currency","commodity_currency","crypto_currency"):
         st.session_state[currency_key]="EUR"
@@ -1728,7 +1732,7 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-04")
+    st.caption("REVISION 2026.10.22-05")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
@@ -1771,7 +1775,7 @@ def dashboard():
         with st.container(key="commodity_controls"):
             money, weight, timeframe, assets_control = st.columns([1, 1.25, 2, 1])
             currency = money.selectbox("Currency", ["EUR", "USD"], label_visibility="collapsed", key="commodity_currency", help="Display currency")
-            metal_weight = weight.selectbox("Precious-metal weight", ["Troy oz", "Grams"], label_visibility="collapsed", key="metal_weight", help="Weight unit for precious metals")
+            metal_weight = weight.selectbox("Precious-metal weight", ["Grams", "Troy oz"], label_visibility="collapsed", key="metal_weight", help="Weight unit for precious metals")
             period = timeframe.radio("Commodity chart range", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, label_visibility="collapsed", key="compact_commodity_period")
             with assets_control.popover("ASSETS", use_container_width=True):
                 choices = st.multiselect("Choose commodities", list(ASSETS)[:11], default=list(ASSETS)[:6], key="commodity_asset_selection")
