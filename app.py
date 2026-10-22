@@ -169,6 +169,12 @@ h3{font-size:1rem!important;}
  .changes-summary{font-size:.72rem;line-height:1.4;padding:5px 0;}
 }
 
+
+.brief-note{font-family:Arial,sans-serif;font-size:10.5px;line-height:1.5;font-weight:400;color:#8c9faf;margin:2px 0 5px;}
+.brief-notes{font-family:Arial,sans-serif;font-size:10.5px;line-height:1.5;font-weight:400;color:#8296a8;border-top:1px solid #263848;margin-top:6px;padding-top:7px;}
+.brief-note-label{font-size:9px;letter-spacing:1px;font-weight:500;color:#92a8bb;}
+@media(max-width:767px){.brief-note,.brief-notes{font-size:11px;}.brief-note-label{font-size:9.5px;}}
+
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -315,16 +321,6 @@ def required_news_channels(page):
         return tuple(c for c in FEEDS if c not in ("Sports","Crypto"))
     if page=="Sources":
         return tuple(FEEDS)
-    if page=="My Briefing":
-        profile=st.session_state.get("user_interests",{})
-        countries=st.session_state.get("_briefing_countries",profile.get("countries",[]))
-        topics=st.session_state.get("_briefing_topics",profile.get("topics",[]))
-        keywords=st.session_state.get("_briefing_keywords",profile.get("keywords","")).strip()
-        if countries or keywords:return tuple(FEEDS)
-        mapping={"Diplomacy & policy":("World","Politics"),"Economy & energy":("World","Markets"),"Elections":("Elections","Politics"),"Conflicts":("Conflicts","World"),"Crypto":("Crypto",),"Sports":("Sports",)}
-        return tuple(dict.fromkeys(c for topic in topics for c in mapping.get(topic,())))
-    if page=="Timelines":
-        return tuple(c for c in FEEDS if c not in ("Sports","Crypto"))
     if page in ("World", "Politics", "Conflicts", "Elections", "Crypto"):
         return (page,)
     # Sports, country briefings and US reporting already have dedicated feeds.
@@ -457,9 +453,6 @@ def related_reports(group,scope="related"):
     publishers=len({r["source"] for r in group})
     with st.expander(f"RELATED REPORTING · {len(group)} reports / {publishers} publishers"):
         st.caption("Matched by headline similarity and publication time; related reports may differ in facts or framing.")
-        timeline_key=hashlib.sha256((scope+"|"+"|".join(sorted(r["url"] for r in group))).encode()).hexdigest()[:20]
-        if st.button("OPEN REPORT TIMELINE",key="timeline_"+timeline_key,use_container_width=True):
-            timeline_dialog(group)
         for report in group:
             st.markdown(f"**{report['source']}** · {timestamp(report['published'])}")
             st.write(report["title"])
@@ -612,10 +605,9 @@ def story_dialog(item):
         else:
             st.write("Open the original report to read the story.")
         if len(text.split()) < 50:
-            st.caption("Only a short preview is available from this source. Read the full report below.")
-        st.caption(report_context(item))
+            st.markdown('<div class="brief-note">Limited source preview · the full report is available below.</div>',unsafe_allow_html=True)
         st.link_button("OPEN ORIGINAL REPORT ↗", item["url"], use_container_width=True)
-        st.caption("Source excerpt · up to 280 words when accessible · not an AI-written analysis. Inclusion does not independently verify claims.")
+        st.markdown('<aside class="brief-notes"><span class="brief-note-label">SOURCE NOTES</span><br>'+escape(report_context(item))+' · Excerpt up to 280 words where available. Source claims are not independently verified.</aside>',unsafe_allow_html=True)
 
 
 def stories(items, prefix, limit=18):
@@ -799,7 +791,48 @@ def convert_commodity(frame, unit, currency="USD", metal_weight="Troy oz", fx=No
     return out, unit
 
 
-def market_panel(names, assets=None, compact_controls=False, commodity_currency=None, metal_weight="Troy oz", selected_period=None):
+def quote_currency(unit,frame):
+    currency=frame.attrs.get("currency","") if unit=="Quote currency" and frame is not None else unit
+    subunits={"GBp":("GBP",.01),"GBX":("GBP",.01),"ZAc":("ZAR",.01),"ILA":("ILS",.01)}
+    if currency in subunits:return subunits[currency]
+    return currency,1.0
+
+
+def market_fx_pair(frame,unit,target):
+    if frame is None or frame.empty or target=="Native quote":return None
+    currency,_=quote_currency(unit,frame)
+    if isinstance(currency,str) and re.fullmatch(r"[A-Z]{3}",currency) and currency!=target:
+        return target+currency+"=X"
+    return None
+
+
+def convert_market_quote(frame,unit,target,fx=None):
+    if frame is None or frame.empty:return None,unit
+    if target=="Native quote":return frame,frame.attrs.get("currency","Quote currency unavailable") if unit=="Quote currency" else unit
+    currency,scale=quote_currency(unit,frame)
+    if not isinstance(currency,str) or not re.fullmatch(r"[A-Z]{3}",currency):
+        # Index levels and currency-pair ratios retain their meaningful native units.
+        return (None,target) if unit=="Quote currency" else (frame,unit)
+    out=frame.copy();attrs=dict(frame.attrs)
+    columns=[c for c in ["Open","High","Low","Close"] if c in out]
+    out[columns]=out[columns]*scale
+    if currency!=target:
+        if fx is None or fx.empty:return None,target
+        out["_day"]=pd.to_datetime(out["Date"]).dt.tz_localize(None).dt.normalize()
+        rates=pd.DataFrame({"_fxday":pd.to_datetime(fx["Date"]).dt.tz_localize(None).dt.normalize(),"_rate":pd.to_numeric(fx["Close"],errors="coerce")})
+        rates=rates.dropna().loc[lambda f:(f["_rate"]>0)&(f["_rate"]<float("inf"))].sort_values("_fxday").drop_duplicates("_fxday",keep="last")
+        out=pd.merge_asof(out.sort_values("_day"),rates,left_on="_day",right_on="_fxday",direction="backward",tolerance=pd.Timedelta(days=7))
+        out=out.dropna(subset=["_rate"])
+        if out.empty:return None,target
+        out[columns]=out[columns].div(out["_rate"],axis=0)
+        out=out.drop(columns=["_day","_fxday","_rate"])
+        attrs["conversion_note"]=f"{target} estimate converted from {currency} using historical daily FX closes (same date or preceding available date, up to 7 days). Candle OHLC uses one FX close per day. The source listing remains in its original currency. Percentage changes include currency movements."
+        attrs["fx_estimate"]=True
+    attrs["currency"]=target;out.attrs=attrs
+    return out,target
+
+
+def market_panel(names, assets=None, compact_controls=False, commodity_currency=None, metal_weight="Troy oz", selected_period=None, display_currency=None):
     assets = ASSETS if assets is None else assets
     if selected_period is not None:
         period = selected_period
@@ -815,6 +848,12 @@ def market_panel(names, assets=None, compact_controls=False, commodity_currency=
     if commodity_currency == "EUR" and (fx is None or fx.empty):
         st.warning("EUR conversion unavailable: exchange-rate feed could not be loaded. Select USD to view source prices.")
 
+    market_rates={}
+    if display_currency:
+        pairs=list(dict.fromkeys(pair for name,frame in zip(names,frames) if (pair:=market_fx_pair(frame,assets[name][1],display_currency))))
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            market_rates=dict(zip(pairs,pool.map(market_data,pairs)))
+
     # Build actual rows so each asset keeps its position as cards change height.
     columns_per_row = 4 if compact_controls else 3
     for offset in range(0, len(names), columns_per_row):
@@ -823,10 +862,13 @@ def market_panel(names, assets=None, compact_controls=False, commodity_currency=
             symbol, unit = assets[name]
             if commodity_currency is not None:
                 frame, unit = convert_commodity(frame, unit, commodity_currency, metal_weight, fx)
+            elif display_currency:
+                pair=market_fx_pair(frame,unit,display_currency)
+                frame,unit=convert_market_quote(frame,unit,display_currency,market_rates.get(pair))
             with col, st.container(border=True):
                 if frame is None or frame.empty:
                     st.metric(name, "Unavailable")
-                    st.caption("Feed unavailable; no substitute price shown.")
+                    st.caption("Price or required FX feed unavailable; no substitute price shown.")
                 else:
                     view = chart_window(frame, period)
                     if unit == "Quote currency":
@@ -836,7 +878,7 @@ def market_panel(names, assets=None, compact_controls=False, commodity_currency=
                     delta = f"{(close/previous-1)*100:+.2f}% vs prior close" if previous else None
                     st.metric(name, display_price(close, unit), delta)
                     unit_label = {"GBp": "GBp · British pence (100 GBp = 1 GBP)", "GBX": "GBX · British pence (100 GBX = 1 GBP)", "ZAc": "ZAc · South African cents", "ILA": "ILA · Israeli agorot"}.get(unit, unit)
-                    st.caption(f'{unit_label} · {market_freshness(frame)}')
+                    st.caption(f'{unit_label}'+(' · FX estimate' if frame.attrs.get("fx_estimate") else '')+f' · {market_freshness(frame)}')
                     if view.empty:
                         st.info("No observations in selected range.")
                     else:
@@ -876,7 +918,9 @@ def company_search(query):
 
 
 def markets_page():
-    st.subheader("MARKETS")
+    title,currency_control=st.columns([4,1])
+    title.subheader("MARKETS")
+    currency=currency_control.selectbox("Display currency",["EUR","USD","Native quote"],key="market_currency",label_visibility="collapsed")
     if "company_watchlist" not in st.session_state:
         st.session_state.company_watchlist = {}
     with st.form("company_search_form", border=False):
@@ -913,7 +957,11 @@ def markets_page():
             if frame is None or frame.empty:
                 st.info("Price history unavailable for this listing.")
             else:
-                market_dialog(selected["name"],selected["symbol"],frame.attrs.get("currency","Quote currency unavailable"),frame)
+                unit=frame.attrs.get("currency","Quote currency unavailable")
+                pair=market_fx_pair(frame,unit,currency)
+                converted,unit=convert_market_quote(frame,unit,currency,market_data(pair) if pair else None)
+                if converted is None:st.info("Required FX rate unavailable for this listing.")
+                else:market_dialog(selected["name"],selected["symbol"],unit,converted)
         if dismiss.button("CLOSE", use_container_width=True, help="Hide search results"):
             st.session_state.company_results = []
             st.rerun()
@@ -928,7 +976,8 @@ def markets_page():
             key="global_market_selection")
         st.caption("Choose indices, currencies, crypto or added companies. Choices last for this session.")
     if choices:
-        market_panel(choices,registry,compact_controls=True)
+        market_panel(choices,registry,compact_controls=True,display_currency=currency)
+        st.caption("Currency applies to quoted prices; indices retain points and FX pairs retain their ratio units. Converted prices are daily FX estimates.")
     else:
         st.info("Open Edit watchlist to choose markets, or search for a company above.")
 
@@ -1212,11 +1261,8 @@ def country_monitor(code):
         st.rerun()
     country=catalog[code]
     st.subheader(country["name"].upper()+" / COUNTRY BRIEFING")
-    views=["Briefing","Economy & energy","Diplomacy & policy","Elections","Timeline","Videos"]
+    views=["Briefing","Economy & energy","Diplomacy & policy","Elections"]
     view=st.radio("COUNTRY VIEW",views,horizontal=True,key="country_view_"+code)
-    if view=="Videos":
-        videos_panel(code)
-        return
     topic={"Economy & energy":"Economy","Diplomacy & policy":"Policy","Elections":"Elections"}.get(view,"All")
     if view=="Briefing":
         focus=st.radio("REPORTING FOCUS",["All","Conflicts","Elections"],index=["All","Conflicts","Elections"].index(st.session_state.get("monitor_country_layer","All")),horizontal=True,key="country_layer_"+code)
@@ -1236,9 +1282,6 @@ def country_monitor(code):
             else:
                 st.caption(calendar_error or "No upcoming national election returned for this country.")
             st.caption("Community-maintained dates require verification at election authorities. Official polling/results are not connected.")
-    if view=="Timeline":
-        render_timeline(rows)
-        return
     if view=="Briefing" and rows:
         st.markdown("#### KEY DEVELOPMENTS / RETRIEVED REPORTS")
         for group in group_reporting(rows)[:3]:
@@ -1514,118 +1557,21 @@ def report_context(item):
     return "Publisher reporting · claims remain attributed"
 
 
-def render_timeline(rows):
-    dated=sorted((r for r in rows if r.get("published")),key=lambda r:datetime.fromisoformat(r["published"]))
-    unique={}
-    for report in dated:unique.setdefault(report_key(report),report)
-    st.caption("Publication timeline · oldest to newest · source claims can differ; publication time is not necessarily event time")
-    if not unique:st.info("No dated reports available for this timeline.")
-    for report in unique.values():
-        with st.container(border=True):
-            st.markdown("**"+timestamp(report["published"])+" · "+report["source"]+"**")
-            st.write(report["title"])
-            st.caption(report_context(report))
-            if report.get("summary"):st.write(short_preview(report["summary"],85))
-            st.link_button("OPEN SOURCE ↗",report["url"])
 
 
-@st.dialog("REPORT TIMELINE",width="large")
-def timeline_dialog(group):
-    st.markdown(f'<div class="brief-title">{escape(group[0]["title"])}</div>',unsafe_allow_html=True)
-    with st.container(key="brief_scroll",border=False):render_timeline(group)
 
 
-def timeline_page(items):
-    st.subheader("EVENT TIMELINES")
-    st.caption("Related reporting grouped by headline similarity · use source links to assess the underlying claims")
-    groups=group_reporting(items)
-    if not groups:
-        st.info("No reporting matches the current filters.");return
-    selection=st.selectbox("Choose a developing story",list(range(len(groups))),format_func=lambda i:f'{len(groups[i])} report(s) · {groups[i][0]["title"]}',key="event_story")
-    render_timeline(groups[selection])
 
 
-VIDEO_CHANNELS={"BBC News":"UC16niRr50-MSBwiO3YDb3RA","Reuters":"UChqUTb7kYRX8-EiaN3XFrSQ"}
 
 
-def videos_from_channel_page(html,publisher):
-    match=re.search(r"(?:var\s+)?ytInitialData\s*=\s*",html)
-    if not match:return []
-    try:data,_=json.JSONDecoder().raw_decode(html[match.end():])
-    except (ValueError,TypeError):return []
-    stack=[data];rows=[];seen=set()
-    while stack and len(rows)<30:
-        node=stack.pop()
-        if isinstance(node,dict):
-            video=node.get("videoRenderer")
-            lockup=node.get("lockupViewModel")
-            if not isinstance(video,dict) and isinstance(lockup,dict):
-                title=lockup.get("metadata",{}).get("lockupMetadataViewModel",{}).get("title",{}).get("content","")
-                relative=re.search(r"\b\d+\s+(?:seconds?|minutes?|hours?|days?|weeks?|months?|years?) ago\b",json.dumps(lockup.get("metadata",{})),re.I)
-                video={"videoId":lockup.get("contentId",""),"title":{"simpleText":title},"publishedTimeText":{"simpleText":relative.group(0) if relative else ""}}
-            if isinstance(video,dict):
-                video_id=video.get("videoId","")
-                title="".join(r.get("text","") for r in video.get("title",{}).get("runs",[])) or video.get("title",{}).get("simpleText","")
-                if re.fullmatch(r"[A-Za-z0-9_-]{11}",video_id) and title and video_id not in seen:
-                    seen.add(video_id)
-                    relative=video.get("publishedTimeText",{}).get("simpleText","")
-                    rows.append(dict(title=clean(title),source=publisher+" · YouTube",category="Videos",url="https://www.youtube.com/watch?v="+video_id,summary="",published=None,published_label=clean(relative),fetched_at=datetime.now(UTC).isoformat()))
-            stack.extend(reversed(list(node.values())))
-        elif isinstance(node,list):stack.extend(reversed(node))
-    return rows
 
 
-@st.cache_data(ttl=300,show_spinner=False)
-def publisher_videos(publisher):
-    rows,error=fetch_feed("Videos",publisher+" · YouTube", "https://www.youtube.com/feeds/videos.xml?channel_id="+VIDEO_CHANNELS[publisher])
-    if rows:return rows,None
-    try:
-        handle={"BBC News":"BBCNews","Reuters":"Reuters"}[publisher]
-        response=requests.get("https://www.youtube.com/@"+handle+"/videos",headers=HEADERS,timeout=12)
-        response.raise_for_status()
-        rows=videos_from_channel_page(response.text[:3000000],publisher)
-        if rows:return rows,None
-    except Exception:pass
-    return [],error or publisher+": video listing unavailable"
 
 
-@st.dialog("PUBLISHER VIDEO",width="large")
-def video_dialog(item):
-    st.markdown(f'<div class="brief-title">{escape(item["title"])}</div>',unsafe_allow_html=True)
-    st.caption(item["source"]+" · "+timestamp(item["published"]))
-    st.video(item["url"])
-    st.link_button("WATCH AT SOURCE ↗",item["url"])
-    st.caption("Playback depends on publisher permissions and regional availability. No autoplay.")
 
 
-def videos_panel(country_code=None):
-    st.subheader("VIDEO BRIEFINGS")
-    publisher=st.radio("PUBLISHER",["All"]+list(VIDEO_CHANNELS),horizontal=True,key="video_publisher_"+str(country_code))
-    chosen=list(VIDEO_CHANNELS) if publisher=="All" else [publisher]
-    with ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(publisher_videos,chosen))
-    rows=[]
-    for reports,error in results:
-        if error:st.caption(error)
-    for index in range(max((len(reports) for reports,error in results),default=0)):
-        for reports,error in results:
-            if index<len(reports):rows.append(reports[index])
-    dated=filter_reports([r for r in rows if r.get("published")])
-    undated=[r for r in rows if not r.get("published") and (not search.strip() or search.casefold() in r["title"].casefold())]
-    rows=list({report_key(r):r for r in dated+undated}.values())
-    if country_code:
-        rows=[r for r in rows if country_code in country_mentions(r["title"]+" "+r.get("summary",""),country_catalog())]
-    rows.sort(key=lambda r:r.get("published") or "",reverse=True)
-    st.caption("Latest clips from the listed publisher channels · country matching uses titles/summaries · play only when selected. Undated channel-page clips may fall outside the selected story window.")
-    if not rows:st.info("No matching clips in the latest retrieved channel uploads. Publisher channel links remain available below.")
-    for offset in range(0,min(12,len(rows)),2):
-        for col,item in zip(st.columns(2),rows[offset:offset+2]):
-            with col,st.container(border=True):
-                video_id=dict(parse_qsl(urlparse(item["url"]).query)).get("v","")
-                if re.fullmatch(r"[A-Za-z0-9_-]{11}",video_id):st.image("https://i.ytimg.com/vi/"+video_id+"/hqdefault.jpg",use_container_width=True)
-                st.write(item["title"])
-                st.caption(item["source"]+" · "+(item.get("published_label") or timestamp(item["published"])))
-                if st.button("▶ PLAY VIDEO",key="play_"+str(country_code)+"_"+hashlib.sha256(item["url"].encode()).hexdigest()[:16],use_container_width=True):video_dialog(item)
-    for name in chosen:st.link_button(name+" / CHANNEL ↗","https://www.youtube.com/channel/"+VIDEO_CHANNELS[name])
+
 
 
 CRYPTO_DEFAULTS={"Bitcoin":"BTC","Ethereum":"ETH","Solana":"SOL","XRP":"XRP"}
@@ -1673,7 +1619,7 @@ def crypto_dialog(name,symbol,currency,frame,period):
 def crypto_page(items):
     st.subheader("CRYPTO / MARKET MONITOR")
     currency_col,period_col=st.columns([1,3])
-    currency=currency_col.selectbox("Currency",["USD","EUR"],key="crypto_currency",label_visibility="collapsed")
+    currency=currency_col.selectbox("Currency",["EUR","USD"],key="crypto_currency",label_visibility="collapsed")
     period=period_col.radio("Chart range",["1D","1W","1M","1Y"],horizontal=True,index=2,key="crypto_period",label_visibility="collapsed")
     summary,error=crypto_global(currency)
     if summary:
@@ -1752,36 +1698,15 @@ def grouped_news(rows,scope,limit=12):
                 related_reports(group,scope=scope+str(index))
 
 
-def my_briefing(items):
-    st.subheader("MY BRIEFING")
-    catalog=country_catalog();ordered=sorted(catalog,key=lambda code:catalog[code]["name"])
-    topics={"Diplomacy & policy":r"diploma|sanction|policy|treaty|legislat", "Economy & energy":r"econom|inflation|central bank|oil|energy|trade", "Elections":ELECTION_WORDS, "Conflicts":CONFLICT_WORDS, "Crypto":r"bitcoin|ethereum|crypto", "Sports":r"football|tennis|basketball|sport"}
-    profile=st.session_state.get("user_interests",{})
-    with st.expander("YOUR INTERESTS",expanded=True):
-        countries=st.multiselect("Countries",ordered,format_func=lambda code:catalog[code]["name"],default=profile.get("countries",[]),max_selections=6,key="_briefing_countries")
-        chosen=st.multiselect("Topics",list(topics),default=profile.get("topics",[]),key="_briefing_topics")
-        words=st.text_area("Companies or keywords — one per line",value=profile.get("keywords",""),placeholder="Add your own interests…",key="_briefing_keywords")
-        st.caption("Blank by default · stored only during this browser session · matches any selected country, topic or keyword within retrieved feeds")
-    st.session_state.user_interests=dict(countries=list(countries),topics=list(chosen),keywords=words)
-    keywords=[w.strip().casefold() for w in words.splitlines() if w.strip()][:20]
-    if not (countries or chosen or keywords):
-        st.info("Choose an interest above to build your briefing.");return
-    selected=[]
-    for item in items:
-        text=item["title"]+" "+item.get("summary","")
-        if (countries and set(countries)&set(country_mentions(text,catalog))) or any(re.search(topics[t],text,re.I) for t in chosen) or any(w in text.casefold() for w in keywords):selected.append(item)
-    st.caption("Coverage is limited to the connected feeds; search and story-window filters also apply.")
-    grouped_news(selected,"personal_briefing",18)
 
 
 def refresh_page_data(page, country_open=False):
     if page=="Overview" and country_open:
         country_news.clear()
-        publisher_videos.clear()
         elections_calendar.clear()
         feed_snapshot.clear()
         return
-    if page in ("Overview","World","Politics","Conflicts","Elections","Sports","US Elections","Sources","Crypto","Timelines","My Briefing","Videos"):
+    if page in ("Overview","World","Politics","Conflicts","Elections","Sports","US Elections","Sources","Crypto"):
         feed_snapshot.clear()
     if page in ("Overview","Markets","Commodities"):
         market_data.clear()
@@ -1792,17 +1717,22 @@ def refresh_page_data(page, country_open=False):
     if page=="Crypto":
         crypto_history.clear()
         crypto_global.clear()
-    if page=="Videos":
-        publisher_videos.clear()
+
+
+# Apply the new defaults once per session, then honour subsequent user changes.
+if not st.session_state.get("eur_defaults_20261022_04"):
+    for currency_key in ("market_currency","commodity_currency","crypto_currency"):
+        st.session_state[currency_key]="EUR"
+    st.session_state.eur_defaults_20261022_04=True
 
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-03")
-    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Timelines", "My Briefing", "Videos", "Sources"])
+    st.caption("REVISION 2026.10.22-04")
+    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
-    auto = st.toggle("Automatic refresh", value=True, help="News: 3 minutes · crypto/video: 5 minutes · market pages: 10 minutes · calendar: 6-hour cache")
+    auto = st.toggle("Automatic refresh", value=True, help="News: 3 minutes · crypto: 5 minutes · market pages: 10 minutes · calendar: 6-hour cache")
     if st.button("REFRESH PAGE DATA", use_container_width=True):
         refresh_page_data(section,bool(st.session_state.get("monitor_country")))
 
@@ -1815,7 +1745,7 @@ else:
     st.markdown('<div class="mini-brand">◈ INTELLIGENCE HUB</div>', unsafe_allow_html=True)
 
 
-refresh_interval = "600s" if section in ("Markets","Commodities") else "300s" if section in ("Crypto","Videos") else "180s"
+refresh_interval = "600s" if section in ("Markets","Commodities") else "300s" if section=="Crypto" else "180s"
 
 
 @st.fragment(run_every=refresh_interval if auto else None)
@@ -1840,7 +1770,7 @@ def dashboard():
         st.subheader("COMMODITIES")
         with st.container(key="commodity_controls"):
             money, weight, timeframe, assets_control = st.columns([1, 1.25, 2, 1])
-            currency = money.selectbox("Currency", ["USD", "EUR"], label_visibility="collapsed", key="commodity_currency", help="Display currency")
+            currency = money.selectbox("Currency", ["EUR", "USD"], label_visibility="collapsed", key="commodity_currency", help="Display currency")
             metal_weight = weight.selectbox("Precious-metal weight", ["Troy oz", "Grams"], label_visibility="collapsed", key="metal_weight", help="Weight unit for precious metals")
             period = timeframe.radio("Commodity chart range", ["1M", "3M", "6M", "1Y"], index=1, horizontal=True, label_visibility="collapsed", key="compact_commodity_period")
             with assets_control.popover("ASSETS", use_container_width=True):
@@ -1854,12 +1784,6 @@ def dashboard():
     elif section == "Crypto":
         with st.container(key="markets_compact_page"):
             crypto_page(items)
-    elif section == "Timelines":
-        timeline_page(items)
-    elif section == "My Briefing":
-        my_briefing(items)
-    elif section == "Videos":
-        videos_panel()
     elif section == "Sports":
         with st.container(key="sports_desk"):
             sports_panel()
