@@ -6,7 +6,7 @@ import hashlib
 import json
 from html.parser import HTMLParser
 import re
-from urllib.parse import quote, urlencode, urlparse
+from urllib.parse import quote, urlencode, urlparse, parse_qsl, urlunparse
 from zoneinfo import ZoneInfo
 
 import feedparser
@@ -294,7 +294,9 @@ def fetch_feed(category,source,url):
 
 
 def required_news_channels(page):
-    if page in ("Overview", "Sources"):
+    if page == "Overview":
+        return tuple(c for c in FEEDS if c != "Sports")
+    if page == "Sources":
         return tuple(FEEDS)
     if page in ("World", "Politics", "Conflicts", "Elections"):
         return (page,)
@@ -352,10 +354,27 @@ def market_freshness(frame):
     return f"{status} · {day:%d %b}"+(f" · fetched {elapsed_label(fetched)}" if fetched else "")
 
 
+def report_key(item):
+    parsed=urlparse(item["url"])
+    # Retain article identifiers while discarding campaign tracking and fragments.
+    query=[(k,v) for k,v in parse_qsl(parsed.query,keep_blank_values=True)
+           if not k.casefold().startswith("utm_") and k.casefold() not in {"fbclid","gclid","ocid","cmpid"}]
+    return urlunparse((parsed.scheme,parsed.netloc.casefold(),parsed.path,parsed.params,urlencode(query),""))
+
+
+def normalized_headline(item):
+    title=clean(item["title"]).replace("’", "'").replace("–","-").replace("—","-")
+    publisher=re.escape(item.get("source", ""))
+    if publisher:
+        title=re.sub(r"\s+[-|]\s+"+publisher+r"\s*$","",title,flags=re.I)
+    return re.sub(r"\s+[-|]\s+(?:Reuters|CNN|Fox News|BBC(?: News)?).*$","",title,flags=re.I)
+
+
 def headline_terms(item):
-    title=re.sub(r"\s+[-–|]\s+(?:Reuters|CNN|Fox News|BBC(?: News)?).*$","",item["title"],flags=re.I)
+    title=normalized_headline(item)
     stop=set("a an the to of in on for and or as at by with from is are was were be been says said say after over amid about new latest news live updates update breaking report reports what how why".split())
-    return {w for w in re.findall(r"[a-z0-9]+",title.casefold()) if len(w)>2 and w not in stop}
+    equivalents={"freed":"release","frees":"release","free":"release","released":"release","releases":"release","prisoners":"prisoner","elections":"election","talks":"talk","negotiations":"talk"}
+    return {equivalents.get(w,w) for w in re.findall(r"[a-z0-9]+",title.casefold()) if len(w)>2 and w not in stop}
 
 
 @st.cache_data(ttl=180, max_entries=64, show_spinner=False)
@@ -365,6 +384,7 @@ def group_reporting(items):
     index, exact, lead_urls = {}, {}, {}
     for item in sorted(items,key=lambda x:x.get("published") or "",reverse=True):
         terms=headline_terms(item)
+        key=report_key(item)
         stamp=pd.Timestamp(item["published"]) if item.get("published") else None
         candidates=set(exact.get(frozenset(terms),[])) if terms else set()
         shared_counts={}
@@ -372,28 +392,35 @@ def group_reporting(items):
             for group_id in index.get(term,()):
                 shared_counts[group_id]=shared_counts.get(group_id,0)+1
         candidates.update(i for i,count in shared_counts.items() if count>=4)
-        if item["url"] in lead_urls:
-            candidates.add(lead_urls[item["url"]])
+        if key in lead_urls:
+            candidates.add(lead_urls[key])
         match=None
         for group_id in sorted(candidates):
             other,other_stamp=leads[group_id]
-            same_url=item["url"]==groups[group_id][0]["url"]
+            same_url=key==report_key(groups[group_id][0])
             within=bool(stamp is not None and other_stamp is not None and abs((stamp-other_stamp).total_seconds())<=48*3600)
             shared=len(terms & other)
-            similar=shared>=4 and shared/max(1,len(terms|other))>=.50 and shared/max(1,min(len(terms),len(other)))>=.72
-            if same_url or (within and (bool(terms) and terms==other or similar)):
+            other_title=groups[group_id][0]["title"].casefold()
+            title=item["title"].casefold()
+            opposites=[(r"\b(?:wins?|won|victory)\b",r"\b(?:loses?|lost|defeat)\b"),(r"\b(?:approves?|approved|passes?|passed)\b",r"\b(?:rejects?|rejected|blocks?|blocked)\b")]
+            opposed=any((re.search(a,title) and re.search(b,other_title)) or (re.search(b,title) and re.search(a,other_title)) for a,b in opposites)
+            numbers_a=set(re.findall(r"\b\d+(?:[.,]\d+)?\b",title))
+            numbers_b=set(re.findall(r"\b\d+(?:[.,]\d+)?\b",other_title))
+            different_numbers=bool(numbers_a and numbers_b and numbers_a!=numbers_b)
+            similar=not opposed and not different_numbers and shared>=4 and shared/max(1,len(terms|other))>=.50 and shared/max(1,min(len(terms),len(other)))>=.72
+            if same_url or (within and (bool(terms) and terms==other and not opposed and not different_numbers or similar)):
                 match=group_id
                 break
         if match is None:
             group_id=len(groups)
-            groups.append([item]);leads.append((terms,stamp));group_urls.append({item["url"]})
-            lead_urls.setdefault(item["url"],group_id)
+            groups.append([item]);leads.append((terms,stamp));group_urls.append({key})
+            lead_urls.setdefault(key,group_id)
             exact.setdefault(frozenset(terms),[]).append(group_id)
             for term in terms:
                 index.setdefault(term,[]).append(group_id)
-        elif item["url"] not in group_urls[match]:
+        elif key not in group_urls[match]:
             groups[match].append(item)
-            group_urls[match].add(item["url"])
+            group_urls[match].add(key)
     return groups
 
 
@@ -1295,10 +1322,62 @@ def world_monitor(items):
         st.caption("National elections only · Wikidata community-maintained calendar · six-hour cache · verify dates at election authorities. Polls/results require original verified sources. Map boundaries: world.geo.json / Natural Earth; boundaries are illustrative.")
 
 
-def overview_panel(items, errors):
+def update_overview_changes(items, previous=None):
+    reports={report_key(r):r for r in items if r.get("category")!="Sports"}
+    signature=tuple(sorted((key,r.get("published"),r["title"]) for key,r in reports.items()))
+    if previous is None:
+        return dict(known=dict.fromkeys(reports),signature=signature,pending={},started=datetime.now(UTC).isoformat())
+    if signature==previous["signature"]:
+        return previous
+    state=dict(previous,known=dict(previous["known"]),pending=dict(previous["pending"]),signature=signature)
+    for key,report in reports.items():
+        if key not in state["known"]:
+            state["pending"][key]=report
+        state["known"][key]=None
+    # Bound session memory; retain discovery order for the most recent 5,000 URLs.
+    while len(state["known"])>5000:
+        state["known"].pop(next(iter(state["known"])))
+    pending=sorted(state["pending"].items(),key=lambda pair:pair[1].get("published") or "",reverse=True)
+    state["pending"]=dict(pending[:50])
+    return state
+
+
+def overview_changes(all_items, visible_items):
+    state=update_overview_changes(all_items,st.session_state.get("overview_change_state"))
+    st.session_state.overview_change_state=state
+    st.subheader("WHAT CHANGED")
+    visible={report_key(r) for r in visible_items}
+    pending=[r for key,r in state["pending"].items() if key in visible]
+    groups=group_reporting(pending)
+    if not groups:
+        st.caption("No newly retrieved reports in your current filters. Tracking started "+timestamp(state["started"])+" during this visit.")
+    else:
+        st.caption(f"{len(groups)} new reporting groups in your current filters · discovered during this visit")
+        for index,group in enumerate(groups[:3]):
+            item=group[0]
+            with st.container(border=True):
+                st.markdown(f'<div class="tag">NEW REPORT · {escape(item["category"].upper())}</div><div class="sport-headline">{escape(item["title"])}</div>',unsafe_allow_html=True)
+                st.caption(f'{item["source"]} · {timestamp(item["published"])}')
+                if st.button("OPEN BRIEF",key=f"change_brief_{index}",use_container_width=True):
+                    story_dialog(item)
+                related_reports(group)
+        if len(groups)>3:
+            with st.expander(f"{len(groups)-3} MORE REPORTING GROUPS"):
+                for group in groups[3:]:
+                    st.link_button(group[0]["title"],group[0]["url"])
+        if st.button("MARK UPDATES AS READ",key="clear_overview_changes"):
+            state["pending"]={}
+            st.session_state.overview_change_state=state
+            st.rerun()
+    st.caption("Tracks newly retrieved reports during this session; it does not independently establish new world events. Reloading the session starts a new baseline.")
+
+
+def overview_panel(items, errors, change_items=None):
     if st.session_state.get("monitor_country"):
         country_monitor(st.session_state.monitor_country)
         return
+    items=[r for r in items if r["category"]!="Sports"]
+    overview_changes(items if change_items is None else change_items,items)
     st.subheader("MARKET PULSE")
     basket = {name: ASSETS[name] if name in ASSETS else MARKET_PRESETS[name]
               for name in ["S&P 500", "Nasdaq", "Gold", "Silver", "Brent oil", "EUR / USD"]}
@@ -1336,7 +1415,7 @@ def overview_panel(items, errors):
     st.caption("Daily quotes · Yahoo Finance · delayed · 1M sparklines · metals/oil: futures")
     world_monitor(items)
     st.subheader("LATEST INTELLIGENCE")
-    channels = ["All", "World", "Politics", "Elections", "Conflicts", "Markets", "Sports"]
+    channels = ["All", "World", "Politics", "Elections", "Conflicts", "Markets"]
     for tab, channel in zip(st.tabs(channels), channels):
         with tab:
             selected = items if channel == "All" else [a for a in items if a["category"] == channel]
@@ -1355,8 +1434,9 @@ def overview_panel(items, errors):
                             story_dialog(item)
                         b.link_button("SOURCE ↗", item["url"], use_container_width=True)
                         related_reports(groups[card_index])
-    with st.expander("FEED HEALTH"):
-        st.write(f"{sum(map(len, FEEDS.values())) - len(errors)} / {sum(map(len, FEEDS.values()))} feeds available on last check")
+    with st.expander("FEED STATISTICS & HEALTH",expanded=False):
+        health=st.session_state.get("feed_health",[])
+        st.caption(f"{len(items)} retrieved articles in your filters · {sum(bool(r['Available']) for r in health)} / {len(health)} checked feeds available")
         feed_health_panel()
         st.caption("Search and story-window filters apply to news only. Market and calendar panels use their own source dates.")
 
@@ -1378,7 +1458,7 @@ def refresh_page_data(page, country_open=False):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-01")
+    st.caption("REVISION 2026.10.22-02")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
@@ -1390,7 +1470,7 @@ with st.sidebar:
 if section == "Overview":
     st.markdown('<div class="tag">GLOBAL MONITORING / PERSONAL TERMINAL</div>', unsafe_allow_html=True)
     st.title("INTELLIGENCE HUB")
-    st.caption("WORLD • POLITICS • ELECTIONS • MARKETS • COMMODITIES • SPORT")
+    st.caption("WORLD • POLITICS • ELECTIONS • MARKETS • COMMODITIES")
 else:
     st.markdown('<div class="mini-brand">◈ INTELLIGENCE HUB</div>', unsafe_allow_html=True)
 
@@ -1413,15 +1493,6 @@ def dashboard():
     items = [a for a in all_items if a["published"] and datetime.fromisoformat(a["published"]) >= cutoff]
     if search.strip():
         items = [a for a in items if search.casefold() in (a["title"] + " " + a["summary"]).casefold()]
-    if section == "Overview":
-        with st.container(key="overview_kpis"):
-            a, b, c, d = st.columns(4)
-            a.metric("STORIES IN WINDOW", len(items))
-            b.metric("AVAILABLE FEEDS", sum(map(len, FEEDS.values())) - len(errors))
-            c.metric("CHANNELS", len(FEEDS))
-            d.metric("VIEW · MALTA", datetime.now(LOCAL).strftime("%H:%M"))
-        stamps=[r["Checked"] for r in st.session_state.get("feed_health",[])]
-        st.caption("Feeds fetched "+(elapsed_label(min(stamps)) if stamps else "time unavailable")+" · cached up to 3 minutes · details in Feed Health")
     if section == "Markets":
         with st.container(key="markets_compact_page"):
             markets_page()
@@ -1475,7 +1546,7 @@ def dashboard():
         st.write("Markets: Yahoo Finance via yfinance; 10-minute cache; daily observations. Election calendar: Wikidata; 6-hour cache. Polling: original-source datasets only; none connected.")
         st.caption("Google News election links may open its publisher redirect. Conflict channels include regional reporting and do not independently confirm military events. Undated articles are excluded from time-filtered feeds.")
     elif section == "Overview":
-        overview_panel(items, errors)
+        overview_panel(items, errors, change_items=all_items)
     elif section in ["World", "Politics", "Conflicts"]:
         news_desk(items, section)
     else:
