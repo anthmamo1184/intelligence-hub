@@ -612,7 +612,7 @@ def story_dialog(item):
 
 def stories(items, prefix, limit=18):
     if not items:
-        st.info("No matching stories. Try a wider filter, or check source status.")
+        st.info("No matching stories. Try All reporting in News coverage, widen the story window or check source status.")
     for story_index, item in enumerate(items[:limit]):
         with st.container(border=True):
             st.markdown(f'<div class="tag">{escape(item["category"].upper())}</div><div class="headline">{escape(item["title"])}</div>', unsafe_allow_html=True)
@@ -1152,7 +1152,7 @@ def news_desk(items, channel, scope=None):
         latest=timestamp(rows[0]["published"]) if rows else "—"
         cols[3].metric("LATEST / MALTA",datetime.fromisoformat(rows[0]["published"]).astimezone(LOCAL).strftime("%H:%M") if rows else "—")
     if not rows:
-        st.info("No stories match these filters. Try All, select a publisher or widen the story window.")
+        st.info("No stories match these filters. Try All reporting in News coverage, choose a publisher or widen the story window.")
         return
     with st.expander("ACTIVITY & SOURCE BREAKDOWN", expanded=False):
         left,right=st.columns(2)
@@ -1543,8 +1543,9 @@ def overview_panel(items, errors, change_items=None):
 
 def filter_reports(rows):
     cutoff=datetime.now(UTC)-timedelta(hours=age)
-    return [r for r in rows if r.get("published") and datetime.fromisoformat(r["published"])>=cutoff
+    filtered=[r for r in rows if r.get("published") and datetime.fromisoformat(r["published"])>=cutoff
         and (not search.strip() or search.casefold() in (r["title"]+" "+r.get("summary","")).casefold())]
+    return scope_reports(filtered)
 
 
 def report_context(item):
@@ -1700,6 +1701,159 @@ def grouped_news(rows,scope,limit=12):
 
 
 
+
+def is_major_development(item):
+    text=clean(item["title"]+" "+item.get("summary","")).casefold()
+    if item.get("category")=="Sports":return True
+    if re.match(r"^(?:opinion|editorial|commentary)\s*[:|\-]",item["title"],re.I):return False
+    if re.search(r"\b(?:horoscope|celebrity gossip|red carpet|recipe|beauty tips|lottery numbers)\b",text):return False
+    major=r"\b(?:supreme court|constitutional court|parliament|congress|central bank|interest rates?|inflation|gross domestic product|gdp|federal budget|national budget|national debt|trade (?:deal|war|agreement|tariffs?)|tariffs?|sanctions?|treaty|diplomatic|diplomacy|nuclear|military|invasion|airstrikes?|missiles?|ceasefire|armed conflict|war crimes|humanitarian|refugees?|earthquake|tsunami|hurricane|mass shooting|nationwide|national strike|supply chain|oil prices?|gas prices?|energy crisis|power grid|pandemic|public health emergency|bank failure|financial crisis|stock markets?|antitrust|bitcoin|ethereum|crypto(?:currency)?)\b"
+    if re.search(major,text):return True
+    election=bool(re.search(r"\b(?:elections?|voting|ballots?|polling|runoff|run-off)\b",text))
+    local=bool(re.search(r"\b(?:municipal|mayoral|city council|county|by-election|by election|local election|regional election|state assembly)\b",text))
+    if election and not local:return True
+    policy=r"\b(?:president|prime minister|government|cabinet|minister)\b.{0,70}\b(?:signs?|approves?|approved|announces?|announced|resigns?|resigned|appoints?|appointed|legislation|reforms?|budget|peace|trade)\b"
+    if re.search(policy,text):return True
+    companies=r"\b(?:nvidia|microsoft|apple|amazon|alphabet|google|meta|tesla)\b"
+    action=r"\b(?:earnings|revenue|profits?|layoffs|merger|acquisition|regulat|antitrust|launches|unveils)\b"
+    return bool(re.search(companies,text) and re.search(action,text))
+
+
+def scope_reports(rows,mode=None):
+    mode=mode or st.session_state.get("news_scope","Major developments")
+    return list(rows) if mode=="All reporting" else [r for r in rows if is_major_development(r)]
+
+
+ECONOMIC_SOURCES={
+    "BLS":("https://www.bls.gov/schedule/news_release/bls.ics","https://www.bls.gov/schedule/","United States"),
+    "BEA":("https://www.bea.gov/news/schedule/ics/online-calendar-subscription.ics","https://www.bea.gov/news/schedule","United States"),
+    "Federal Reserve":("https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm","https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm","United States"),
+    "ECB":("https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html","https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html","Euro area"),
+}
+
+
+def economic_category(title):
+    text=title.casefold()
+    if re.search(r"consumer price|producer price|personal income|personal consumption",text):return "Inflation & spending"
+    if re.search(r"employment situation|job openings|labor turnover|employment cost|productivity",text):return "Jobs & wages"
+    if re.search(r"gross domestic product|international trade|international transactions",text):return "Growth & trade"
+    if re.search(r"fomc|monetary policy",text):return "Central banks"
+    return None
+
+
+def economic_event(title,day,publisher,source,region,when=None,time_note="Time not published"):
+    return dict(Event=clean(title),Date=day,Region=region,Category=economic_category(title),Publisher=publisher,Source=source,WhenUTC=when,TimeNote=time_note)
+
+
+def parse_release_ics(text,publisher,source,region):
+    # Unfold continuation lines before parsing; retain explicit source time zones.
+    text=re.sub(r"\r?\n[ \t]","",text)
+    rows=[]
+    aliases={"US-Eastern":"America/New_York","Eastern Standard Time":"America/New_York"}
+    for block in re.findall(r"BEGIN:VEVENT\s*(.*?)END:VEVENT",text,re.S):
+        fields={}
+        for line in block.splitlines():
+            if ":" in line:
+                key,value=line.split(":",1);fields[key]=value.strip()
+        summary=next((v for k,v in fields.items() if k.split(";")[0]=="SUMMARY"),"")
+        title=summary.replace(r"\,",",").replace(r"\;",";").replace(r"\n"," ")
+        if not economic_category(title):continue
+        start=next(((k,v) for k,v in fields.items() if k.split(";")[0]=="DTSTART"),None)
+        if not start:continue
+        key,value=start;when=None;note="Time not published"
+        try:
+            date=datetime.strptime(value[:8],"%Y%m%d").date()
+            if "T" in value:
+                local=datetime.strptime(value.rstrip("Z"),"%Y%m%dT%H%M%S")
+                zone_match=re.search(r"TZID=([^;:]+)",key)
+                zone="UTC" if value.endswith("Z") else aliases.get(zone_match.group(1),zone_match.group(1)) if zone_match else None
+                if zone:
+                    aware=local.replace(tzinfo=ZoneInfo(zone));when=aware.astimezone(UTC).isoformat();note=zone
+                else:note=local.strftime("%H:%M")+" · source time zone unspecified"
+            url=fields.get("URL",source)
+            rows.append(economic_event(title,date.isoformat(),publisher,safe_url(url) or source,region,when,note))
+        except (ValueError,KeyError):continue
+    return rows
+
+
+def parse_policy_calendar(html,publisher,source,region):
+    rows=[]
+    if publisher=="ECB":
+        for raw_date,raw_title in re.findall(r"<dt\b[^>]*>(.*?)</dt>\s*<dd\b[^>]*>(.*?)</dd>",html,re.S|re.I):
+            title=clean(raw_title)
+            if "monetary policy meeting" not in title.casefold() or "non-monetary" in title.casefold() or "day 2" not in title.casefold():continue
+            try:day=datetime.strptime(clean(raw_date),"%d/%m/%Y").date().isoformat()
+            except ValueError:continue
+            rows.append(economic_event("ECB monetary policy meeting / press conference",day,publisher,source,region))
+    else:
+        sections=list(re.finditer(r"(20\d{2}) FOMC Meetings",html))
+        for i,match in enumerate(sections):
+            chunk=html[match.end():sections[i+1].start() if i+1<len(sections) else len(html)]
+            pattern=r'class=["\'][^"\']*fomc-meeting__month[^"\']*["\'][^>]*>(.*?)</div>\s*<div[^>]*class=["\'][^"\']*fomc-meeting__date[^"\']*["\'][^>]*>(.*?)</div>'
+            for raw_month,raw_days in re.findall(pattern,chunk,re.S|re.I):
+                month=clean(raw_month).split("/")[-1].strip();days=re.findall(r"\d+",clean(raw_days))
+                if not days:continue
+                for fmt in ("%B %d %Y","%b %d %Y"):
+                    try:day=datetime.strptime(month+" "+days[-1]+" "+match.group(1),fmt).date().isoformat();break
+                    except ValueError:day=None
+                if day:rows.append(economic_event("FOMC meeting / final day",day,publisher,source,region))
+    return rows
+
+
+@st.cache_data(ttl=21600,show_spinner=False)
+def economic_calendar_source(publisher):
+    url,source,region=ECONOMIC_SOURCES[publisher];checked=datetime.now(UTC).isoformat()
+    try:
+        response=requests.get(url,headers=HEADERS,timeout=15);response.raise_for_status()
+        rows=parse_release_ics(response.text,publisher,source,region) if publisher in ("BLS","BEA") else parse_policy_calendar(response.text,publisher,source,region)
+        if not rows:raise ValueError("No supported events parsed")
+        return rows,dict(Publisher=publisher,Status="Available",Checked=checked,Events=len(rows),Source=source)
+    except Exception:
+        return [],dict(Publisher=publisher,Status="Unavailable / no supported events",Checked=checked,Events=0,Source=source)
+
+
+def economic_calendar_page():
+    st.subheader("ECONOMIC CALENDAR")
+    st.caption("Selected official US releases and US/euro-area monetary policy meetings · dates can change · forecasts and actual release values are not connected")
+    with ThreadPoolExecutor(max_workers=4) as pool:results=list(pool.map(economic_calendar_source,ECONOMIC_SOURCES))
+    rows=[];statuses=[];seen=set()
+    for events,status in results:
+        statuses.append(status)
+        for event in events:
+            key=(event["Publisher"],event["Event"],event["Date"],event["WhenUTC"])
+            if key not in seen:seen.add(key);rows.append(event)
+    region_col,category_col,time_col=st.columns([1,1.5,1])
+    region=region_col.selectbox("Region",["All","United States","Euro area"],key="econ_region")
+    category=category_col.selectbox("Release type",["All","Inflation & spending","Jobs & wages","Growth & trade","Central banks"],key="econ_category")
+    zone=time_col.selectbox("Display time",["Malta","UTC"],key="econ_zone")
+    today=datetime.now(LOCAL).date()
+    dates=st.date_input("Date range",value=(today,today+timedelta(days=30)),key="econ_dates")
+    if not isinstance(dates,(list,tuple)) or len(dates)!=2:
+        st.info("Select both a start and end date.");return
+    start,end=dates
+    display=[];upcoming=[]
+    for row in rows:
+        when=datetime.fromisoformat(row["WhenUTC"]).astimezone(LOCAL if zone=="Malta" else UTC) if row["WhenUTC"] else None
+        day=when.date() if when else datetime.fromisoformat(row["Date"]).date()
+        if not start<=day<=end or (region!="All" and row["Region"]!=region) or (category!="All" and row["Category"]!=category):continue
+        record={"Date":day.isoformat(),"Time":when.strftime("%H:%M %Z") if when else row["TimeNote"],"Event":row["Event"],"Region":row["Region"],"Type":row["Category"],"Publisher":row["Publisher"],"Source":row["Source"]}
+        display.append(record)
+        if (when and when>=datetime.now(UTC)) or (not when and day>=today):upcoming.append(record)
+    display.sort(key=lambda r:(r["Date"],r["Time"]))
+    if display:
+        upcoming.sort(key=lambda r:(r["Date"],r["Time"]))
+        if upcoming:st.caption("NEXT IN RANGE · "+upcoming[0]["Date"]+" · "+upcoming[0]["Time"]+" · "+upcoming[0]["Event"])
+        frame=pd.DataFrame(display)
+        st.dataframe(frame,hide_index=True,use_container_width=True,column_config={"Source":st.column_config.LinkColumn("Official source ↗")},height=min(540,40+35*len(frame)))
+        st.download_button("DOWNLOAD FILTERED CALENDAR",frame.to_csv(index=False).encode("utf-8"),"economic_calendar.csv","text/csv")
+    else:st.info("No supported releases returned for these dates and filters. Check source coverage below.")
+    failed=sum(status["Status"]!="Available" for status in statuses)
+    if failed:st.caption(f"{failed} official source(s) unavailable; coverage is partial.")
+    with st.expander("SOURCES & COVERAGE"):
+        st.dataframe(pd.DataFrame(statuses),hide_index=True,use_container_width=True,column_config={"Source":st.column_config.LinkColumn("Official calendar")})
+        st.caption("BLS: selected inflation, employment and wage releases. BEA: GDP, spending/income and international trade releases. Fed/ECB: policy meeting final days. Meeting calendars without explicit release times show time not published. All calendars are cached up to 6 hours; use Refresh page data to recheck.")
+
+
 def refresh_page_data(page, country_open=False):
     if page=="Overview" and country_open:
         country_news.clear()
@@ -1714,6 +1868,8 @@ def refresh_page_data(page, country_open=False):
         elections_calendar.clear()
     if page=="Markets":
         company_search.clear()
+    if page=="Economic Calendar":
+        economic_calendar_source.clear()
     if page=="Crypto":
         crypto_history.clear()
         crypto_global.clear()
@@ -1732,8 +1888,9 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-05")
-    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Sources"])
+    st.caption("REVISION 2026.10.22-06")
+    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"])
+    news_scope=st.selectbox("NEWS COVERAGE",["Major developments","All reporting"],key="news_scope",help="Keyword-based filter for policy, elections, conflicts and major economic developments. Sports keeps its own coverage. Choose All reporting for broader coverage.")
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
     auto = st.toggle("Automatic refresh", value=True, help="News: 3 minutes · crypto: 5 minutes · market pages: 10 minutes · calendar: 6-hour cache")
@@ -1749,7 +1906,7 @@ else:
     st.markdown('<div class="mini-brand">◈ INTELLIGENCE HUB</div>', unsafe_allow_html=True)
 
 
-refresh_interval = "600s" if section in ("Markets","Commodities") else "300s" if section=="Crypto" else "180s"
+refresh_interval = "3600s" if section=="Economic Calendar" else "600s" if section in ("Markets","Commodities") else "300s" if section=="Crypto" else "180s"
 
 
 @st.fragment(run_every=refresh_interval if auto else None)
@@ -1767,7 +1924,10 @@ def dashboard():
     items = [a for a in all_items if a["published"] and datetime.fromisoformat(a["published"]) >= cutoff]
     if search.strip():
         items = [a for a in items if search.casefold() in (a["title"] + " " + a["summary"]).casefold()]
-    if section == "Markets":
+    items=scope_reports(items)
+    if section == "Economic Calendar":
+        economic_calendar_page()
+    elif section == "Markets":
         with st.container(key="markets_compact_page"):
             markets_page()
     elif section == "Commodities":
