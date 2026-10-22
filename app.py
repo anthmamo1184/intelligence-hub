@@ -1335,66 +1335,6 @@ def map_highlight(conflict,election,coverage):
 
 
 
-@st.cache_data(ttl=21600,max_entries=256,show_spinner=False)
-def country_profile(code):
-    """Load one pinned country; never fetch profiles during pointer movement."""
-    if not re.fullmatch(r"[A-Z]{3}",code) or code not in country_catalog():return {}
-    checked=datetime.now(UTC).isoformat()
-    def get_json(url,params=None):
-        try:
-            response=requests.get(url,params=params,headers=HEADERS,timeout=10)
-            response.raise_for_status()
-            return response.json()
-        except Exception:return None
-    def indicator(ind):
-        url=f"https://api.worldbank.org/v2/country/{code}/indicator/{ind}"
-        data=get_json(url,{"format":"json","mrnev":1,"per_page":5})
-        rows=data[1] if isinstance(data,list) and len(data)>1 and isinstance(data[1],list) else []
-        row=next((row for row in rows if isinstance(row,dict) and row.get("value") is not None),None)
-        return {"value":row["value"],"year":row.get("date",""),"updated":data[0].get("lastupdated","") if isinstance(data[0],dict) else "","url":url+"?format=json&mrnev=1"} if row else None
-    def metadata():
-        data=get_json(f"https://api.worldbank.org/v2/country/{code}",{"format":"json"})
-        return data[1][0] if isinstance(data,list) and len(data)>1 and isinstance(data[1],list) and data[1] else {}
-    def leadership():
-        query='''SELECT DISTINCT ?country ?capitalLabel ?currencyLabel ?continentLabel ?personLabel ?role WHERE {
-          ?country wdt:P298 "CODE".
-          OPTIONAL {?country wdt:P36 ?capital.}
-          OPTIONAL {?country wdt:P38 ?currency.}
-          OPTIONAL {?country wdt:P30 ?continent.}
-          OPTIONAL {
-            VALUES (?property ?claim ?value ?role) {(wdt:P35 p:P35 ps:P35 "Head of state") (wdt:P6 p:P6 ps:P6 "Head of government")}
-            ?country ?property ?person; ?claim ?statement. ?statement ?value ?person.
-            FILTER NOT EXISTS {?statement wikibase:rank wikibase:DeprecatedRank.}
-            FILTER NOT EXISTS {?statement pq:P582 ?end. FILTER(?end <= NOW())}
-            FILTER NOT EXISTS {?statement pq:P580 ?start. FILTER(?start > NOW())}
-          }
-          SERVICE wikibase:label {bd:serviceParam wikibase:language "en".}
-        } LIMIT 30'''.replace("CODE",code)
-        data=get_json("https://query.wikidata.org/sparql",{"query":query,"format":"json"})
-        rows=data.get("results",{}).get("bindings",[]) if isinstance(data,dict) else []
-        capital,currency,continents,leaders=[],[],[],{}
-        source="https://www.wikidata.org"
-        resolved_labels={}
-        def resolve_label(value):
-            if not re.fullmatch(r"Q\d+",value):return value
-            if value not in resolved_labels:
-                data=get_json("https://www.wikidata.org/w/api.php",{"action":"wbgetentities","ids":value,"props":"labels","languages":"en","format":"json"})
-                resolved_labels[value]=(data.get("entities",{}).get(value,{}).get("labels",{}).get("en",{}).get("value","") if isinstance(data,dict) else "")
-            return resolved_labels[value]
-        for row in rows:
-            if row.get("country",{}).get("value"):source=row["country"]["value"].replace("http:","https:")
-            for field,target in [("capitalLabel",capital),("currencyLabel",currency),("continentLabel",continents)]:
-                value=resolve_label(row.get(field,{}).get("value",""))
-                if value and not re.fullmatch(r"Q\d+",value) and value not in target:target.append(value)
-            role=row.get("role",{}).get("value","");person=row.get("personLabel",{}).get("value","")
-            if role and person and not re.fullmatch(r"Q\d+",person):leaders.setdefault(role,[]).append(person)
-        return {"capital":", ".join(capital),"region":", ".join(continents),"currency":", ".join(currency),"leaders":{role:", ".join(dict.fromkeys(names)) for role,names in leaders.items()},"url":source}
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        tasks=[pool.submit(metadata),pool.submit(indicator,"SP.POP.TOTL"),pool.submit(indicator,"NY.GDP.MKTP.KD.ZG"),pool.submit(leadership)]
-        meta,population,growth,office=[task.result() for task in tasks]
-    return {"code":code,"flag":"".join(chr(127397+ord(c)) for c in pycountry.countries.get(alpha_3=code).alpha_2),"checked":checked,"capital":office.get("capital") or meta.get("capitalCity") or "Unavailable","region":office.get("region") or "Region unavailable","currency":office.get("currency") or "Unavailable","leaders":office.get("leaders",{}),"leadershipSource":office.get("url","https://www.wikidata.org"),"population":population,"growth":growth,"metadataSource":f"https://api.worldbank.org/v2/country/{code}?format=json"}
-
-
 @st.cache_resource
 def globe_component(markup):
     import tempfile
@@ -1405,13 +1345,13 @@ def globe_component(markup):
     return declare_component("intel_globe_"+hashlib.sha256(markup.encode()).hexdigest()[:10],path=str(directory))
 
 
-GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}body{position:relative}#leader{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}#globe{display:block;width:100%;height:360px;touch-action:none;cursor:grab}#globe:active{cursor:grabbing}#tip{position:absolute;top:5px;left:5px;pointer-events:auto;background:#0c1c2af5;padding:10px;border-radius:5px;border:1px solid #31566a;box-shadow:0 5px 20px #0005;width:238px;max-width:calc(100% - 10px);display:none;overflow:visible;box-sizing:border-box;font-size:10px;line-height:1.4;z-index:2}#tip strong{font-size:13px;color:#dceef9;display:block;letter-spacing:.7px}#tip .eyebrow{font-size:9px;letter-spacing:1px;margin-bottom:4px}#tip .detail{color:#9ab0c0;margin:4px 0}#tip .headline{border-top:1px solid #294354;margin-top:6px;padding-top:5px;color:#d5e4ee}#tip .bars{display:flex;height:22px;align-items:flex-end;gap:3px;margin-top:5px}#tip .bar{flex:1;min-height:2px;opacity:.75}#tip .foot{font-size:9px;color:#849eaf;margin-top:5px}#help{text-align:center;font-size:11px;color:#8299ab}.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}.profile-card{background:#132b3966;border:1px solid #315063;border-radius:3px;padding:7px;min-width:0}.profile-card small{display:block;color:#8ea8b8;font-size:9px;margin-bottom:3px}.profile-card b{font:11px/1.4 monospace;color:#d4e9f2;overflow-wrap:anywhere}.profile-card a,.profile-sources a{color:#8cd7d4;font-size:9px}.profile-actions{display:flex;gap:5px;margin-top:8px}.profile-actions button{background:#183744;color:#b8eeea;border:1px solid #426673;border-radius:3px;font:10px monospace;padding:5px;cursor:pointer}.profile-sources{font-size:9px;color:#819cab;margin-top:6px}#zoom-controls{position:absolute;left:8px;top:8px;display:flex;gap:3px;z-index:3}#zoom-controls button{font:12px monospace;background:#0d2231;color:#a5e9e4;border:1px solid #34596b;border-radius:3px;min-width:26px;height:25px;cursor:pointer}#zoom-controls button:focus-visible{outline:2px solid #65d6d0}#zoom-value{font:10px monospace;color:#8caebb;padding:7px 4px}
+GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}body{position:relative}#leader{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}#globe{display:block;width:100%;height:360px;touch-action:none;cursor:grab}#globe:active{cursor:grabbing}#tip{position:absolute;top:5px;left:5px;pointer-events:auto;background:#0c1c2af5;padding:10px;border-radius:5px;border:1px solid #31566a;box-shadow:0 5px 20px #0005;width:238px;max-width:calc(100% - 10px);display:none;overflow:visible;box-sizing:border-box;font-size:10px;line-height:1.4;z-index:2}#tip strong{font-size:13px;color:#dceef9;display:block;letter-spacing:.7px}#tip .eyebrow{font-size:9px;letter-spacing:1px;margin-bottom:4px}#tip .detail{color:#9ab0c0;margin:4px 0}#tip .headline{border-top:1px solid #294354;margin-top:6px;padding-top:5px;color:#d5e4ee}#tip .bars{display:flex;height:22px;align-items:flex-end;gap:3px;margin-top:5px}#tip .bar{flex:1;min-height:2px;opacity:.75}#tip .foot{font-size:9px;color:#849eaf;margin-top:5px}#help{text-align:center;font-size:11px;color:#8299ab}.profile-actions{display:flex;gap:5px;margin-top:8px}.profile-actions button{background:#183744;color:#b8eeea;border:1px solid #426673;border-radius:3px;font:10px monospace;padding:5px;cursor:pointer}#zoom-controls{position:absolute;left:8px;top:8px;display:flex;gap:3px;z-index:3}#zoom-controls button{font:12px monospace;background:#0d2231;color:#a5e9e4;border:1px solid #34596b;border-radius:3px;min-width:26px;height:25px;cursor:pointer}#zoom-controls button:focus-visible{outline:2px solid #65d6d0}#zoom-value{font:10px monospace;color:#8caebb;padding:7px 4px}
 </style></head><body><div id="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-reset" aria-label="Reset globe view">Reset</button><span id="zoom-value">1.0×</span></div><div id="tip"></div><svg id="globe" aria-label="Interactive world globe" role="img"></svg><svg id="leader" aria-hidden="true"><polyline id="callout-line" fill="none" stroke="#65d6d0" stroke-width="1"/><circle id="callout-dot" r="3" fill="#65d6d0"/></svg><script>
 let lastFrameHeight=null;const send=(type,extra={})=>{if(type==='streamlit:setFrameHeight'){if(extra.height===lastFrameHeight)return;lastFrameHeight=extra.height;}parent.postMessage({isStreamlitMessage:true,type,...extra},'*');};
 send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:360});
 const tip=document.getElementById('tip');
 function calloutLayout(width){const card=Math.min(340,Math.max(280,width*.38));return width>=640?{x:width-card-6,y:14,cx:(width-card-24)/2,card:card,mobile:false}:{x:6,y:368,cx:width/2,card:width-12,mobile:true};}
-function resetIntel(force=false){if(pinnedCode&&!force)return;tip.replaceChildren();tip.style.display='none';document.getElementById('leader').style.display='none';send('streamlit:setFrameHeight',{height:360});}
+function resetIntel(force=false,resize=true){if(pinnedCode&&!force)return;cancelHover();activeHoverCode=null;tip.replaceChildren();tip.style.display='none';document.getElementById('leader').style.display='none';if(resize)send('streamlit:setFrameHeight',{height:360});}
 function positionIntel(e){
  const width=document.body.clientWidth,layout=calloutLayout(width);
  tip.style.display='block';tip.style.left=layout.x+'px';tip.style.top=layout.y+'px';tip.style.width=layout.card+'px';
@@ -1419,49 +1359,47 @@ function positionIntel(e){
  leader.style.display='block';const endX=layout.mobile?layout.x+20:layout.x-3,endY=layout.mobile?layout.y:layout.y+Math.min(tip.offsetHeight/2,110);
  line.setAttribute('points',layout.mobile?`${e.clientX},${e.clientY} ${endX},350 ${endX},${endY}`:`${e.clientX},${e.clientY} ${endX-16},${endY} ${endX},${endY}`);
  dot.setAttribute('cx',e.clientX);dot.setAttribute('cy',e.clientY);
- const fullHeight=Math.max(360,layout.y+tip.offsetHeight+10);leader.style.height=fullHeight+'px';send('streamlit:setFrameHeight',{height:fullHeight});
+ const fullHeight=pinnedCode?Math.max(360,layout.y+tip.offsetHeight+10):360;leader.style.height=fullHeight+'px';send('streamlit:setFrameHeight',{height:fullHeight});
 }
 function showIntel(e,d){
  const info=d.properties.intel||{},focus=info.focus||'All',tone=focus==='Conflicts'?'#ca6976':focus==='Elections'?'#c7a15d':'#40e0d0';tip.replaceChildren();
  const add=(tag,text,cls)=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;tip.appendChild(el);return el;};
  add('div',(focus==='All'?'COUNTRY INTELLIGENCE':focus.toUpperCase()+' FOCUS'),'eyebrow').style.color=tone;
- add('strong',d.properties.Country);add('div',(info.reports||0)+' matched reports · selected story window','detail');
+ add('strong',d.properties.Country);add('div','Retrieved reporting · selected story window','detail');
  if(focus==='Elections'){
-  if(info.election){add('div',info.election.name.slice(0,90),'headline');add('div',info.election.date+' · '+info.election.days+' days to vote','detail');add('div','Wikidata calendar · verify with election authority','foot');}
+  if(info.election){add('div',info.election.name.slice(0,pinnedCode?90:64),'headline');add('div',info.election.date+' · '+info.election.days+' days to vote','detail');add('div','Wikidata calendar · verify with election authority','foot');}
   else add('div','No upcoming national vote in connected calendar','detail');
   add('div','Official polls/results not connected','foot');
  }
- if((info.bars||[]).some(n=>n>0)){
+ if(pinnedCode&&(info.bars||[]).some(n=>n>0)){
   add('div','Retrieved reports by publication day (UTC)','foot');const chart=add('div','','bars'),max=Math.max(...info.bars,1);
   info.bars.forEach((v,i)=>{const bar=document.createElement('span');bar.className='bar';bar.style.height=Math.max(2,v/max*22)+'px';bar.style.background=tone;bar.title=info.barDates[i]+': '+v+' reports';chart.appendChild(bar);});
   add('div',info.barDates[0]+' — '+info.barDates[6]+' · selected window only','foot');
  }
- (info.headlines||[]).slice(0,calloutLayout(document.body.clientWidth).mobile?1:2).forEach(r=>{add('div',r.title.slice(0,105),'headline');add('div',r.source.slice(0,45)+' · '+r.time,'foot');});
+ (info.headlines||[]).slice(0,pinnedCode===d.properties.code?2:1).forEach(r=>{add('div',r.title.slice(0,105),'headline');add('div',r.source.slice(0,45)+' · '+r.time,'foot');});
  if(!(info.headlines||[]).length)add('div','No matching retrieved headlines','detail');
- const profile=(args.profiles||{})[d.properties.code];
- renderProfile(profile,d.properties.code,add);
  const actions=add('div','','profile-actions');
  function button(label,action){const b=document.createElement('button');b.textContent=label;b.onclick=()=>send('streamlit:setComponentValue',{value:{code:d.properties.code,action:action,nonce:Date.now()},dataType:'json'});actions.appendChild(b);}
  if(pinnedCode===d.properties.code){button('OPEN COUNTRY ↗','open');button('UNPIN','clear');}
- else add('div','Click country to pin and load its profile','foot');
+ else add('div','Click country to pin this dossier','foot');
  positionIntel(e);
 }
-function renderProfile(p,code,add){
- const grid=add('div','','profile-grid');
- const card=(label,value,note,url)=>{const box=document.createElement('div');box.className='profile-card';const small=document.createElement('small');small.textContent=label;box.appendChild(small);const bold=document.createElement('b');bold.textContent=value;box.appendChild(bold);if(note){const n=document.createElement('small');n.textContent=note;box.appendChild(n);}if(url){const a=document.createElement('a');a.textContent='Source ↗';a.href=url;a.target='_blank';a.rel='noopener noreferrer';box.appendChild(a);}grid.appendChild(box);};
- if(!p){card('COUNTRY PROFILE','Pin country to load','Capital · population · leadership · economy');return;}
- card('CAPITAL / REGION',p.capital,p.region,p.leadershipSource);
- if(p.flag)tip.querySelector('strong').textContent=p.flag+' '+tip.querySelector('strong').textContent;
- card('POPULATION',p.population?Number(p.population.value).toLocaleString():'Unavailable',p.population?'Reference year '+p.population.year:'No figure returned',p.population?.url);
- card('HEAD OF STATE',p.leaders['Head of state']||'Unavailable','Wikidata listing · verify at source',p.leadershipSource);
- card('HEAD OF GOVERNMENT',p.leaders['Head of government']||'Unavailable','Wikidata listing · verify at source',p.leadershipSource);
- card('CURRENCY',p.currency,'Wikidata reference',p.leadershipSource);
- card('GDP GROWTH',p.growth?Number(p.growth.value).toFixed(1)+'%':'Unavailable',p.growth?'Annual real growth · '+p.growth.year:'No figure returned',p.growth?.url);
- add('div','Profile fetched '+p.checked.slice(0,16).replace('T',' ')+' UTC · cached up to 6h','profile-sources');
+let hoverTimer=null,hideTimer=null,activeHoverCode=null,pendingHoverCode=null;
+function cancelHover(){clearTimeout(hoverTimer);clearTimeout(hideTimer);hoverTimer=null;hideTimer=null;pendingHoverCode=null;}
+function queueHover(e,d){
+ clearTimeout(hideTimer);
+ if(activeHoverCode===d.properties.code){clearTimeout(hoverTimer);pendingHoverCode=null;return;}
+ clearTimeout(hoverTimer);pendingHoverCode=d.properties.code;
+ const point={clientX:e.clientX,clientY:e.clientY};
+ hoverTimer=setTimeout(()=>{if(pinnedCode)return;activeHoverCode=d.properties.code;pendingHoverCode=null;showIntel(point,d);},90);
 }
+function delayedHide(){clearTimeout(hoverTimer);pendingHoverCode=null;clearTimeout(hideTimer);hideTimer=setTimeout(()=>resetIntel(),240);}
+tip.addEventListener('mouseenter',cancelHover);tip.addEventListener('mouseleave',delayedHide);
+document.getElementById('globe').addEventListener('mouseenter',()=>clearTimeout(hideTimer));
+document.getElementById('globe').addEventListener('mouseleave',delayedHide);
 let pinnedCode=null;
 let args,rotation=[-15,-20],draw,lastRegion,zoomLevel=1;
-addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;pinnedCode=args.pinned||null;resetIntel(true);if(args.region!==lastRegion){rotation=[-args.center[1],-args.center[0]];lastRegion=args.region;}
+addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;pinnedCode=args.pinned||null;resetIntel(true,false);if(args.region!==lastRegion){rotation=[-args.center[1],-args.center[0]];lastRegion=args.region;}
 if(!window.d3){document.getElementById('tip').textContent='Globe unavailable — use Flat map or country search';return;}
 const width=document.body.clientWidth,height=360,r=Math.min((calloutLayout(width).mobile?width:width-calloutLayout(width).card-24)/2-16,164),root=d3.select('#globe').attr('viewBox',`0 0 ${width} ${height}`);root.selectAll('*').remove();
 const clip=root.append('defs').append('clipPath').attr('id','globe-viewport');clip.append('rect').attr('x',0).attr('y',0).attr('width',calloutLayout(width).mobile?width:calloutLayout(width).x-12).attr('height',height);const svg=root.append('g').attr('clip-path','url(#globe-viewport)');
@@ -1474,11 +1412,11 @@ svg.append('path').datum({type:'Sphere'}).attr('fill','url(#ocean)').attr('strok
 svg.append('path').datum(d3.geoGraticule10()).attr('fill','none').attr('stroke','#2c5265').attr('stroke-width',.4);
 const features=args.features.map(f=>{const g=JSON.parse(JSON.stringify(f));const polys=g.geometry.type==='Polygon'?[g.geometry.coordinates]:g.geometry.type==='MultiPolygon'?g.geometry.coordinates:[];polys.forEach(rings=>{if(d3.geoArea({type:'Polygon',coordinates:rings})>2*Math.PI)rings.forEach(ring=>ring.reverse());});return g;});
 svg.selectAll('.country').data(features).enter().append('path').attr('class','country').attr('fill',d=>d.properties.fill).attr('fill-opacity',d=>d.properties.highlight?.58:.35).attr('stroke','#567889').attr('stroke-width',.45)
-.on('mouseenter',function(e,d){d3.select(this).attr('stroke','#d4ffff').attr('stroke-width',1.5);if(!pinnedCode)showIntel(e,d);})
-.on('mousemove',function(e,d){if(!pinnedCode)positionIntel(e);})
-.on('mouseleave',function(){d3.select(this).attr('stroke','#567889').attr('stroke-width',.45);resetIntel();})
-.on('click',(e,d)=>{if(e.defaultPrevented)return;pinnedCode=d.properties.code;showIntel(e,d);send('streamlit:setComponentValue',{value:{code:d.properties.code,action:'pin',nonce:Date.now()},dataType:'json'});});
-draw=()=>{svg.selectAll('path').attr('d',path);if(pinnedCode){const f=features.find(f=>f.properties.code===pinnedCode);if(f){const center=d3.geoCentroid(f),xy=projection(center),visible=d3.geoDistance(center,[-rotation[0],-rotation[1]])<Math.PI/2;showIntel({clientX:visible?xy[0]:calloutLayout(width).cx,clientY:visible?xy[1]:180},f);if(!visible)document.getElementById('leader').style.display='none';}}};draw();
+.on('mouseenter',function(e,d){d3.select(this).attr('stroke','#d4ffff').attr('stroke-width',1.5);if(!pinnedCode)queueHover(e,d);})
+.on('mousemove',function(e,d){if(!pinnedCode&&activeHoverCode===d.properties.code)positionIntel(e);})
+.on('mouseleave',function(){d3.select(this).attr('stroke','#567889').attr('stroke-width',.45);})
+.on('click',(e,d)=>{if(e.defaultPrevented)return;cancelHover();pinnedCode=d.properties.code;showIntel(e,d);send('streamlit:setComponentValue',{value:{code:d.properties.code,action:'pin',nonce:Date.now()},dataType:'json'});});
+draw=()=>{svg.selectAll('path').attr('d',path);if(pinnedCode){const f=features.find(f=>f.properties.code===pinnedCode);if(f){const center=d3.geoCentroid(f),xy=projection(center),visible=d3.geoDistance(center,[-rotation[0],-rotation[1]])<Math.PI/2;showIntel({clientX:visible?xy[0]:calloutLayout(width).cx,clientY:visible?xy[1]:180},f);if(!visible)document.getElementById('leader').style.display='none';}}};draw();if(!pinnedCode)send('streamlit:setFrameHeight',{height:360});
 function changeZoom(next){zoomLevel=Math.max(1,Math.min(3.5,next));projection.scale(r*zoomLevel);document.getElementById('zoom-value').textContent=zoomLevel.toFixed(1)+'×';resetIntel();draw();}
 document.getElementById('zoom-in').onclick=()=>changeZoom(zoomLevel+.3);document.getElementById('zoom-out').onclick=()=>changeZoom(zoomLevel-.3);
 document.getElementById('zoom-reset').onclick=()=>{rotation=[-args.center[1],-args.center[0]];projection.rotate(rotation);changeZoom(1);};
@@ -1634,7 +1572,7 @@ def world_monitor(items):
         boundaries={"type":"FeatureCollection","features":features}
 
         if map_view=="Globe":
-            result=globe_component(GLOBE_HTML)(features=features,region=region,center=center,profiles=st.session_state.get("country_profiles",{}),pinned=st.session_state.get("pinned_country"),key="overview_globe",default=None)
+            result=globe_component(GLOBE_HTML)(features=features,region=region,center=center,pinned=st.session_state.get("pinned_country"),key="overview_globe",default=None)
             if result and result.get("nonce")!=st.session_state.get("globe_last_nonce"):
                 st.session_state.globe_last_nonce=result.get("nonce")
                 action=result.get("action","pin")
@@ -1645,10 +1583,6 @@ def world_monitor(items):
                     code=result["code"]
                     if action=="open":open_country(code)
                     st.session_state.pinned_country=code
-                    profiles=dict(st.session_state.get("country_profiles",{}))
-                    with st.spinner("Loading country reference data…"):
-                        profiles[code]=country_profile(code)
-                    st.session_state.country_profiles=profiles
                     st.rerun()
         else:
             folium.GeoJson(boundaries,name="Countries",style_function=lambda f:{"fillColor":f["properties"]["fill"],"color":"#426275","weight":.6,"fillOpacity":.32 if f["properties"]["highlight"] else .10},highlight_function=lambda f:{"weight":2,"color":"#8cffff","fillOpacity":.7},tooltip=folium.GeoJsonTooltip(fields=["Country","Articles","Calendar elections","Next national vote"],aliases=["Country","Retrieved articles","Upcoming calendar entries","Next national vote"],sticky=False),embed=True).add_to(m)
@@ -1668,16 +1602,6 @@ def world_monitor(items):
     entries=([("#ca6976","Conflict reports"),("#c7a15d","Election reports / dates"),("#8b8296","Both topics"),("#40e0d0","Other reports"),("#102537","No matched coverage")] if layer=="All" else [("#ca6976","Conflict reports"),("#102537","No matching reports")] if layer=="Conflicts" else [("#c7a15d","Election reports / dates"),("#102537","No matched coverage")])
     st.markdown('<div class="monitor-legend">'+''.join('<span><i style="background:'+color+'"></i>'+label+'</span>' for color,label in entries)+'</div>',unsafe_allow_html=True)
     st.caption("Reporting topics · not a risk rating",help="Countries may be mentioned without being the location of an event. Unhighlighted areas indicate no matching data in connected sources, not absence of events. Use + / − to zoom; Ctrl + wheel also zooms on desktop.")
-    dates=election_countdowns(calendar_rows)
-    if layer in ("All","Elections"):
-        st.markdown('<div class="watch-heading">NEXT NATIONAL VOTES</div>',unsafe_allow_html=True)
-        if dates:
-            cards=[]
-            for row in dates[:3]:
-                cards.append('<a class="vote-card" href="'+escape(row['Source'],quote=True)+'" target="_blank" rel="noopener noreferrer"><div class="vote-country">'+escape(row['Country'])+'</div><div class="vote-countdown">'+str(row['Days to vote'])+'<small> DAYS</small></div><div class="vote-date">'+escape(row['Date'])+' ↗</div></a>')
-            st.markdown('<div class="vote-strip">'+''.join(cards)+'</div>',unsafe_allow_html=True)
-            st.caption("Wikidata calendar · national votes only · confirm with election authorities")
-        else:st.caption("No upcoming national vote dates returned by the connected calendar.")
     with st.expander("OFFICIAL ECONOMIC WATCH",expanded=False):
         st.caption("US economic releases and Fed / ECB meetings · load separately to keep the globe responsive")
         if st.button("LOAD / REFRESH EVENTS",key="overview_load_economic"):
@@ -2157,7 +2081,7 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-13")
+    st.caption("REVISION 2026.10.22-14")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"],key="channel")
     news_scope=st.selectbox("NEWS COVERAGE",["Major developments","All reporting"],key="news_scope",help="Keyword-based filter for policy, elections, conflicts and major economic developments. Sports keeps its own coverage. Choose All reporting for broader coverage.")
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
