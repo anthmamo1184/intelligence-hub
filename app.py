@@ -283,7 +283,7 @@ def feed_snapshot(category, source, url):
                               summary=clean(max([entry.get("summary", "")] + [c.get("value", "") for c in entry.get("content", [])], key=lambda text: len(clean(text))))[:6000], source=publisher,
                               category=category, published=stamp.isoformat() if stamp else None, fetched_at=checked))
         dated=[a["published"] for a in items if a["published"]]
-        return items, None, dict(Channel=category,Feed=source,URL=url,Checked=checked,Success=checked,Latest=max(dated) if dated else None,Articles=len(items))
+        return items, None, dict(Channel=category,Feed=source,URL=url,Checked=checked,Success=checked,Latest=max(dated,key=datetime.fromisoformat) if dated else None,Articles=len(items))
     except Exception:
         return [], source + ": unavailable on this check", dict(Channel=category,Feed=source,URL=url,Checked=checked,Success=None,Latest=None,Articles=0)
 
@@ -293,8 +293,20 @@ def fetch_feed(category,source,url):
     return rows,error
 
 
-def news_data():
-    jobs = [(c, s, u) for c, feeds in FEEDS.items() for s, u in feeds]
+def required_news_channels(page):
+    if page in ("Overview", "Sources"):
+        return tuple(FEEDS)
+    if page in ("World", "Politics", "Conflicts", "Elections"):
+        return (page,)
+    # Sports, country briefings and US reporting already have dedicated feeds.
+    return ()
+
+
+def news_data(categories=None):
+    categories=tuple(FEEDS) if categories is None else tuple(categories)
+    jobs = [(c, source, url) for c in categories for source, url in FEEDS.get(c, [])]
+    if not jobs:
+        return [], []
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = list(pool.map(lambda job: feed_snapshot(*job), jobs))
     seen, articles, errors = set(), [], []
@@ -346,26 +358,42 @@ def headline_terms(item):
     return {w for w in re.findall(r"[a-z0-9]+",title.casefold()) if len(w)>2 and w not in stop}
 
 
+@st.cache_data(ttl=180, max_entries=64, show_spinner=False)
 def group_reporting(items):
-    groups=[]
+    # Precompute each lead's terms/time and compare only groups sharing terms.
+    groups, leads, group_urls = [], [], []
+    index, exact, lead_urls = {}, {}, {}
     for item in sorted(items,key=lambda x:x.get("published") or "",reverse=True):
         terms=headline_terms(item)
+        stamp=pd.Timestamp(item["published"]) if item.get("published") else None
+        candidates=set(exact.get(frozenset(terms),[])) if terms else set()
+        shared_counts={}
+        for term in terms:
+            for group_id in index.get(term,()):
+                shared_counts[group_id]=shared_counts.get(group_id,0)+1
+        candidates.update(i for i,count in shared_counts.items() if count>=4)
+        if item["url"] in lead_urls:
+            candidates.add(lead_urls[item["url"]])
         match=None
-        for group in groups:
-            lead=group[0]
-            same_url=item["url"]==lead["url"]
-            a,b=item.get("published"),lead.get("published")
-            within=bool(a and b and abs((pd.Timestamp(a)-pd.Timestamp(b)).total_seconds())<=48*3600)
-            other=headline_terms(lead)
+        for group_id in sorted(candidates):
+            other,other_stamp=leads[group_id]
+            same_url=item["url"]==groups[group_id][0]["url"]
+            within=bool(stamp is not None and other_stamp is not None and abs((stamp-other_stamp).total_seconds())<=48*3600)
             shared=len(terms & other)
             similar=shared>=4 and shared/max(1,len(terms|other))>=.50 and shared/max(1,min(len(terms),len(other)))>=.72
-            if same_url or (within and (terms==other and bool(terms) or similar)):
-                match=group
+            if same_url or (within and (bool(terms) and terms==other or similar)):
+                match=group_id
                 break
         if match is None:
-            groups.append([item])
-        elif not any(r["url"]==item["url"] for r in match):
-            match.append(item)
+            group_id=len(groups)
+            groups.append([item]);leads.append((terms,stamp));group_urls.append({item["url"]})
+            lead_urls.setdefault(item["url"],group_id)
+            exact.setdefault(frozenset(terms),[]).append(group_id)
+            for term in terms:
+                index.setdefault(term,[]).append(group_id)
+        elif item["url"] not in group_urls[match]:
+            groups[match].append(item)
+            group_urls[match].add(item["url"])
     return groups
 
 
@@ -1333,15 +1361,30 @@ def overview_panel(items, errors):
         st.caption("Search and story-window filters apply to news only. Market and calendar panels use their own source dates.")
 
 
+def refresh_page_data(page, country_open=False):
+    if page=="Overview" and country_open:
+        country_news.clear()
+        feed_snapshot.clear()
+        return
+    if page in ("Overview","World","Politics","Conflicts","Elections","Sports","US Elections","Sources"):
+        feed_snapshot.clear()
+    if page in ("Overview","Markets","Commodities"):
+        market_data.clear()
+    if page in ("Overview","Elections"):
+        elections_calendar.clear()
+    if page=="Markets":
+        company_search.clear()
+
+
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.21-25")
+    st.caption("REVISION 2026.10.22-01")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Sources"])
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
-    auto = st.toggle("Auto-refresh every 3 minutes", value=True)
-    if st.button("REFRESH FEEDS", use_container_width=True):
-        st.cache_data.clear()
+    auto = st.toggle("Automatic refresh", value=True, help="News: 3 minutes · market pages: 10 minutes · election calendar: 6-hour cache")
+    if st.button("REFRESH PAGE DATA", use_container_width=True):
+        refresh_page_data(section,bool(st.session_state.get("monitor_country")))
 
 
 if section == "Overview":
@@ -1352,10 +1395,20 @@ else:
     st.markdown('<div class="mini-brand">◈ INTELLIGENCE HUB</div>', unsafe_allow_html=True)
 
 
-@st.fragment(run_every="180s" if auto else None)
+refresh_interval = "600s" if section in ("Markets","Commodities") else "180s"
+
+
+@st.fragment(run_every=refresh_interval if auto else None)
 def dashboard():
-    with st.spinner("Checking source feeds…"):
-        all_items, errors = news_data()
+    if section=="Overview" and st.session_state.get("monitor_country"):
+        country_monitor(st.session_state.monitor_country)
+        return
+    channels=required_news_channels(section)
+    if channels:
+        with st.spinner("Checking source feeds…"):
+            all_items, errors = news_data(channels)
+    else:
+        all_items, errors = [], []
     cutoff = datetime.now(UTC) - timedelta(hours=age)
     items = [a for a in all_items if a["published"] and datetime.fromisoformat(a["published"]) >= cutoff]
     if search.strip():
