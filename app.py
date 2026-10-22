@@ -27,7 +27,7 @@ CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
 .overview-title{font:600 1.6rem Oxanium,monospace;letter-spacing:2px;margin:4px 0 16px}.overview-title span{font:11px monospace;color:#91a8ba;letter-spacing:1px;margin-left:20px}
-.ticker-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid #294354;border-radius:6px;background:#0b1823;margin-top:8px}.ticker-cell{padding:9px 12px;border-right:1px solid #294354;min-width:0}.ticker-cell:last-child{border:0}.ticker-name{font:11px Oxanium,monospace;color:#a8bfd1}.ticker-value{font-size:16px;white-space:nowrap}.ticker-value small{font-size:11px}.ticker-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#8ca5b7}.ticker-bottom svg{width:65px;height:24px;flex-shrink:0}.intel-row{padding:8px 0 0;border-top:1px solid #213b4b;font-size:13px;line-height:1.45}.intel-row .tag{font-size:10px}
+.ticker-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid #294354;border-radius:6px;background:#0b1823;margin-top:8px}.ticker-cell{padding:9px 12px;border-right:1px solid #294354;min-width:0}.ticker-cell:last-child{border:0}.ticker-name{font:11px Oxanium,monospace;color:#a8bfd1}.ticker-value{font-size:16px;white-space:nowrap}.ticker-value small{font-size:11px}.ticker-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#8ca5b7}.ticker-bottom svg{width:65px;height:24px;flex-shrink:0}.intel-row{padding:6px 0 0;border-top:1px solid #213b4b;font-size:13px;line-height:1.45}.intel-row .tag{font-size:10px}.monitor-heading{font:600 15px Oxanium,monospace;letter-spacing:1px;margin:8px 0}.focus-label{font:11px monospace;margin:8px 0 12px}.st-key-overview_command [data-testid="stCaptionContainer"]{font-size:11px}.st-key-overview_command .stButton button{min-height:26px;padding:2px 10px;font-size:11px}.st-key-overview_command [data-testid="stVerticalBlock"]{gap:.5rem}
 @media(max-width:700px){.ticker-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.ticker-cell{padding:8px}.ticker-value{font-size:13px}.ticker-value small{font-size:10px}.ticker-bottom svg{width:35px}.overview-title span{display:block;margin:8px 0 0}.st-key-overview_command [data-testid="stHorizontalBlock"]{flex-wrap:wrap}.st-key-overview_command [data-testid="stColumn"]{min-width:100%!important}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child{order:2}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child{order:1}}
 
 html, body, [class*="css"], [data-testid="stApp"] {font-family:'Share Tech Mono',monospace;}
@@ -1312,9 +1312,9 @@ def election_countdowns(rows):
 
 
 def map_highlight(conflict,election,coverage):
-    if conflict and election:return "#e785c6"
-    if conflict:return "#eeaa55"
-    if election:return "#a995ff"
+    if conflict and election:return "#8b8296"
+    if conflict:return "#ca6976"
+    if election:return "#c7a15d"
     return "#40e0d0" if coverage else "#102537"
 
 
@@ -1329,20 +1329,20 @@ def globe_component():
     return declare_component("intel_globe",path=str(directory))
 
 
-GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>body{margin:0;background:#070d17;color:#a6c0d2;font:12px monospace}svg{display:block;width:100%;touch-action:none;cursor:grab}svg:active{cursor:grabbing}#tip{position:absolute;top:12px;left:12px;pointer-events:none;background:#102537dd;padding:8px;border-radius:4px}#help{text-align:center;font-size:11px;color:#8299ab}</style></head><body><div id="tip">Drag to rotate · click a country</div><svg aria-label="Interactive world globe" role="img"></svg><div id="help">Country search above also opens any briefing</div><script>
+GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}svg{display:block;width:100%;touch-action:none;cursor:grab}svg:active{cursor:grabbing}#tip{position:absolute;top:12px;left:12px;pointer-events:none;background:#102537dd;padding:8px;border-radius:4px}#help{text-align:center;font-size:11px;color:#8299ab}</style></head><body><div id="tip">Drag to rotate · click a country</div><svg aria-label="Interactive world globe" role="img"></svg><div id="help">Country search above also opens any briefing</div><script>
 const send=(type,extra={})=>parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
-send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:400});
+send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:320});
 let args,rotation=[-15,-20],draw,lastRegion;
 addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;if(args.region!==lastRegion){rotation=[-args.center[1],-args.center[0]];lastRegion=args.region;}
 if(!window.d3){document.getElementById('tip').textContent='Globe unavailable — use Flat map or country search';return;}
-const width=document.body.clientWidth,height=370,r=Math.min(width/2-18,174),svg=d3.select('svg').attr('viewBox',`0 0 ${width} ${height}`);svg.selectAll('*').remove();
+const width=document.body.clientWidth,height=292,r=Math.min(width/2-18,136),svg=d3.select('svg').attr('viewBox',`0 0 ${width} ${height}`);svg.selectAll('*').remove();
 const projection=d3.geoOrthographic().translate([width/2,height/2]).scale(r).rotate(rotation).clipAngle(90),path=d3.geoPath(projection);
 const defs=svg.append('defs'),grad=defs.append('radialGradient').attr('id','ocean');grad.append('stop').attr('offset','0%').attr('stop-color','#13394b');grad.append('stop').attr('offset','100%').attr('stop-color','#071420');
 svg.append('circle').attr('cx',width/2).attr('cy',height/2).attr('r',r+5).attr('fill','none').attr('stroke','#29bdb655').attr('stroke-width',3);
 svg.append('path').datum({type:'Sphere'}).attr('fill','url(#ocean)').attr('stroke','#487587');
 svg.append('path').datum(d3.geoGraticule10()).attr('fill','none').attr('stroke','#2c5265').attr('stroke-width',.4);
 const features=args.features.map(f=>{const g=JSON.parse(JSON.stringify(f));const polys=g.geometry.type==='Polygon'?[g.geometry.coordinates]:g.geometry.type==='MultiPolygon'?g.geometry.coordinates:[];polys.forEach(rings=>{if(d3.geoArea({type:'Polygon',coordinates:rings})>2*Math.PI)rings.forEach(ring=>ring.reverse());});return g;});
-svg.selectAll('.country').data(features).enter().append('path').attr('class','country').attr('fill',d=>d.properties.fill).attr('fill-opacity',d=>d.properties.highlight?.85:.5).attr('stroke','#567889').attr('stroke-width',.45)
+svg.selectAll('.country').data(features).enter().append('path').attr('class','country').attr('fill',d=>d.properties.fill).attr('fill-opacity',d=>d.properties.highlight?.58:.35).attr('stroke','#567889').attr('stroke-width',.45)
 .on('mouseenter',function(e,d){d3.select(this).attr('stroke','#d4ffff').attr('stroke-width',1.5);document.getElementById('tip').textContent=d.properties.Country+' · '+d.properties.Articles+' retrieved reports';})
 .on('mouseleave',function(){d3.select(this).attr('stroke','#567889').attr('stroke-width',.45);})
 .on('click',(e,d)=>{if(e.defaultPrevented)return;send('streamlit:setComponentValue',{value:{code:d.properties.code,nonce:Date.now()},dataType:'json'});});
@@ -1351,16 +1351,33 @@ svg.call(d3.drag().on('drag',e=>{rotation=[rotation[0]+e.dx*.35,Math.max(-80,Mat
 });</script></body></html>"""
 
 
+def monitor_reports(items,layer):
+    pattern={"Conflicts":CONFLICT_WORDS,"Elections":ELECTION_WORDS}.get(layer)
+    return [item for item in items if not pattern or re.search(pattern,item.get("title","")+" "+item.get("summary",""),re.I)]
+
+
 def overview_developments(items):
-    st.markdown("#### CURRENT DEVELOPMENTS")
-    groups=group_reporting(items)[:5]
-    if not groups:st.caption("No reporting in the selected window.")
+    layer=st.session_state.get("world_layer","All")
+    heading={"All":"CURRENT DEVELOPMENTS","Conflicts":"CONFLICT DEVELOPMENTS","Elections":"ELECTION DEVELOPMENTS"}[layer]
+    tone={"All":"#40e0d0","Conflicts":"#ca6976","Elections":"#c7a15d"}[layer]
+    st.markdown('<div class="monitor-heading">'+heading+'</div>',unsafe_allow_html=True)
+    st.markdown('<div class="focus-label" style="color:'+tone+'">● '+("All reporting topics" if layer=="All" else layer+" active")+'</div>',unsafe_allow_html=True)
+    groups=group_reporting(monitor_reports(items,layer))[:5]
+    if not groups:st.caption("No matching reports in this window.")
     for index,group in enumerate(groups):
         item=group[0]
         st.markdown('<div class="intel-row"><span class="tag">'+escape(item['category'].upper())+'</span><div>'+escape(item['title'])+'</div></div>',unsafe_allow_html=True)
         st.caption(item['source']+' · '+timestamp(item['published']))
-        if st.button("READ BRIEF ↗",key="focus_brief_"+str(index)):story_dialog(item)
-    st.caption("Latest retrieved reporting · related headlines grouped · source claims remain attributed")
+        if st.button("BRIEF ↗",key="focus_brief_"+str(index)):story_dialog(item)
+    if layer=="Elections":
+        rows,error=elections_calendar()
+        dates=election_countdowns(rows)[:3]
+        st.markdown('<div class="focus-label">UPCOMING NATIONAL VOTES</div>',unsafe_allow_html=True)
+        for row in dates:
+            st.markdown("**"+escape(row["Country"])+"** · "+row["Date"]+" · "+str(row["Days to vote"])+" days")
+            st.link_button("CALENDAR SOURCE ↗",row["Source"])
+        if not dates:st.caption(error or "No upcoming national election dates returned.")
+        st.caption("Wikidata calendar · verify dates with national election authorities")
 
 
 def overview_navigate(channel):
@@ -1376,10 +1393,7 @@ def compact_pulse():
     cells=[]
     for (name,(symbol,unit)),frame in zip(basket.items(),frames):
         if name in ("Gold","Silver","Brent oil"):
-            frame,unit=convert_market_quote(frame,unit,"EUR",fx)
-            if frame is not None and name in ("Gold","Silver"):
-                frame=frame.copy();frame['Close']=frame['Close']/31.1034768;unit="EUR / gram"
-            elif frame is not None:unit="EUR / barrel"
+            frame,unit=convert_commodity(frame,unit,"EUR","Grams",fx)
         if frame is None or frame.empty:
             cells.append('<div class="ticker-cell">'+escape(name)+'<br>Unavailable</div>');continue
         close=float(frame.Close.iloc[-1]);prior=float(frame.Close.iloc[-2]) if len(frame)>1 else None
@@ -1391,20 +1405,21 @@ def compact_pulse():
         delta=f"{change:+.2f}%" if change is not None else "—"
         cells.append(f'<div class="ticker-cell" title="{escape(market_freshness(frame),quote=True)}"><span class="ticker-name">{escape(name)}</span><div class="ticker-value">{value} <small style="color:{tone}">{delta}</small></div><div class="ticker-bottom"><span>{escape(unit)}</span><svg viewBox="0 0 100 28" aria-hidden="true"><polyline points="{points}" fill="none" stroke="{tone}" stroke-width="1.6"/></svg></div></div>')
     st.markdown('<div class="ticker-strip">'+''.join(cells)+'</div>',unsafe_allow_html=True)
-    st.caption("MARKET PULSE · delayed daily closes · 1M traces · metals/oil futures · EUR estimates use historical FX · open Markets / Commodities for full charts")
+    st.caption("MARKET PULSE · delayed daily quotes",help="Yahoo Finance daily closes · 1M sparklines · metals/oil futures · gold/silver EUR per gram, oil EUR per barrel · EUR estimates use historical daily FX. Hover a quote for its source date; open Markets or Commodities for full charts.")
 
 
 def world_monitor(items):
-    st.subheader("WORLD MONITOR")
+    st.markdown('<div class="monitor-heading">WORLD MONITOR</div>',unsafe_allow_html=True)
+    st.caption("MONITOR FOCUS")
     controls,selector,settings=st.columns([2,2,1])
     layer=controls.radio("MAP LAYER",["All","Conflicts","Elections"],horizontal=True,key="world_layer",label_visibility="collapsed")
-    map_view=st.radio("DISPLAY",["Globe","Flat map"],horizontal=True,key="monitor_display")
     catalog=country_catalog()
     ordered=sorted(catalog,key=lambda code:catalog[code]["name"])
     with selector:
         selection=st.selectbox("Find a country",[None]+ordered,format_func=lambda code:"Find a country…" if code is None else catalog[code]["name"],key="country_picker",label_visibility="collapsed")
         if selection and st.button("OPEN COUNTRY ↗",key="open_picked_country",use_container_width=True):open_country(selection)
-    with settings.popover("MAP OPTIONS",use_container_width=True):
+    with settings.popover("⚙",use_container_width=True):
+        map_view=st.radio("Display",["Globe","Flat map"],horizontal=True,key="monitor_display")
         region=st.selectbox("Map region",["World","Europe","Middle East","Americas","Asia-Pacific","Africa"],key="map_region")
         favourites=st.multiselect("Favourite countries",ordered,default=st.session_state.get("saved_country_favourites",[]),format_func=lambda code:catalog[code]["name"],max_selections=6,key="country_favourites")
         st.session_state.saved_country_favourites=list(favourites)
@@ -1413,12 +1428,8 @@ def world_monitor(items):
             if st.button("★ "+catalog[code]["name"],key="favourite_country_"+code,use_container_width=True):open_country(code)
     counts={}
     conflict_counts,election_counts={},{}
-    for item in items:
+    for item in monitor_reports(items,layer):
         text=item["title"]+" "+item["summary"]
-        if layer=="Conflicts" and not re.search(CONFLICT_WORDS,text,re.I):
-            continue
-        if layer=="Elections" and not re.search(ELECTION_WORDS,text,re.I):
-            continue
         for code in country_mentions(text,catalog):
             counts[code]=counts.get(code,0)+1
             if re.search(CONFLICT_WORDS,text,re.I):
@@ -1436,7 +1447,7 @@ def world_monitor(items):
             elections.setdefault(code,[]).append(row)
     data=world_geometry()
     if data:
-        color="#eeaa55" if layer=="Conflicts" else "#a995ff" if layer=="Elections" else "#40e0d0"
+        color="#ca6976" if layer=="Conflicts" else "#c7a15d" if layer=="Elections" else "#40e0d0"
         regions={"World":([22,10],2),"Europe":([52,15],4),"Middle East":([30,43],4),"Americas":([15,-80],3),"Asia-Pacific":([24,115],3),"Africa":([1,20],3)}
         center,zoom=regions[region]
         m=folium.Map(location=center,zoom_start=zoom,min_zoom=1,max_zoom=7,tiles=None,control_scale=True,prefer_canvas=True,scrollWheelZoom=False)
@@ -1460,7 +1471,7 @@ def world_monitor(items):
             props["highlight"]=bool(props["Articles"] or props["Calendar elections"])
             conflict=bool(conflict_counts.get(code)) if layer in ["All","Conflicts"] else False
             election=bool(election_counts.get(code) or elections.get(code)) if layer in ["All","Elections"] else False
-            props["fill"]=map_highlight(conflict,election,props["Articles"])
+            props["fill"]=("#ca6976" if conflict else "#102537") if layer=="Conflicts" else ("#c7a15d" if election else "#102537") if layer=="Elections" else map_highlight(conflict,election,props["Articles"])
             dates=election_countdowns(elections.get(code,[]))
             props["Next national vote"]=f'{dates[0]["Date"]} · {dates[0]["Days to vote"]} days' if dates else "No calendar entry"
             f["properties"]=props
@@ -1486,7 +1497,8 @@ def world_monitor(items):
                         break
     else:
         st.info("Map boundaries are unavailable. Select a country above to open its briefing.")
-    st.markdown('<div style="font-size:.75rem;line-height:1.7"><span style="color:#eeaa55">● Conflict reporting</span> &nbsp; <span style="color:#a995ff">● Election news / dates</span> &nbsp; <span style="color:#e785c6">● Both</span> &nbsp; <span style="color:#40e0d0">● Other coverage</span></div>',unsafe_allow_html=True)
+    legend={"All":'<span style="color:#ca6976">● Conflict reporting</span> &nbsp; <span style="color:#c7a15d">● Election news / dates</span> &nbsp; <span style="color:#8b8296">● Both</span> &nbsp; <span style="color:#40e0d0">● Other coverage</span>',"Conflicts":'<span style="color:#ca6976">● Conflicts active · matching reporting</span>',"Elections":'<span style="color:#c7a15d">● Elections active · matching reporting / national vote dates</span>'}[layer]
+    st.markdown('<div style="font-size:.7rem;line-height:1.7">'+legend+'</div>',unsafe_allow_html=True)
     st.caption("Click a country for its briefing · colours show retrieved reporting and calendar coverage")
     with st.popover("MAP INFORMATION & COVERAGE"):
         st.caption("Conflict highlights use keyword-matched reporting, not verified war-zone boundaries. Mentions can concern several countries; no highlight does not establish absence of conflict or elections.")
@@ -1565,6 +1577,7 @@ def overview_panel(items, errors, change_items=None):
     items=[r for r in items if r["category"]!="Sports"]
     overview_changes(items if change_items is None else change_items,items)
     compact_pulse()
+    st.caption("EXPLORE DESKS")
     for col,channel in zip(st.columns(6),["World","Politics","Conflicts","Elections","Economic Calendar","Markets"]):
         col.button(channel.upper()+" ↗",key="branch_"+channel,on_click=overview_navigate,args=(channel,),use_container_width=True)
     with st.container(key="overview_command"):
@@ -1946,7 +1959,7 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-07")
+    st.caption("REVISION 2026.10.22-08")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"],key="channel")
     news_scope=st.selectbox("NEWS COVERAGE",["Major developments","All reporting"],key="news_scope",help="Keyword-based filter for policy, elections, conflicts and major economic developments. Sports keeps its own coverage. Choose All reporting for broader coverage.")
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
