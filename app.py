@@ -1343,19 +1343,28 @@ def globe_component(markup):
     return declare_component("intel_globe_"+hashlib.sha256(markup.encode()).hexdigest()[:10],path=str(directory))
 
 
-GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}svg{display:block;width:100%;height:258px;touch-action:none;cursor:grab}svg:active{cursor:grabbing}#tip{position:absolute;top:5px;left:5px;pointer-events:none;background:#0c1c2af5;padding:10px;border-radius:5px;border:1px solid #31566a;box-shadow:0 5px 20px #0005;width:238px;max-width:calc(100% - 10px);max-height:246px;overflow:auto;box-sizing:border-box;font-size:10px;line-height:1.4;z-index:2}#tip strong{font-size:13px;color:#dceef9;display:block;letter-spacing:.7px}#tip .eyebrow{font-size:9px;letter-spacing:1px;margin-bottom:4px}#tip .detail{color:#9ab0c0;margin:4px 0}#tip .headline{border-top:1px solid #294354;margin-top:6px;padding-top:5px;color:#d5e4ee}#tip .bars{display:flex;height:22px;align-items:flex-end;gap:3px;margin-top:5px}#tip .bar{flex:1;min-height:2px;opacity:.75}#tip .foot{font-size:9px;color:#849eaf;margin-top:5px}#help{text-align:center;font-size:11px;color:#8299ab}</style></head><body><div id="tip">Hover to inspect · drag to rotate</div><svg aria-label="Interactive world globe" role="img"></svg><div id="help">Country search above also opens any briefing</div><script>
+GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}body{position:relative}#leader{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}#globe{display:block;width:100%;height:360px;touch-action:none;cursor:grab}#globe:active{cursor:grabbing}#tip{position:absolute;top:5px;left:5px;pointer-events:none;background:#0c1c2af5;padding:10px;border-radius:5px;border:1px solid #31566a;box-shadow:0 5px 20px #0005;width:238px;max-width:calc(100% - 10px);display:none;overflow:visible;box-sizing:border-box;font-size:10px;line-height:1.4;z-index:2}#tip strong{font-size:13px;color:#dceef9;display:block;letter-spacing:.7px}#tip .eyebrow{font-size:9px;letter-spacing:1px;margin-bottom:4px}#tip .detail{color:#9ab0c0;margin:4px 0}#tip .headline{border-top:1px solid #294354;margin-top:6px;padding-top:5px;color:#d5e4ee}#tip .bars{display:flex;height:22px;align-items:flex-end;gap:3px;margin-top:5px}#tip .bar{flex:1;min-height:2px;opacity:.75}#tip .foot{font-size:9px;color:#849eaf;margin-top:5px}#help{text-align:center;font-size:11px;color:#8299ab}</style></head><body><div id="tip"></div><svg id="globe" aria-label="Interactive world globe" role="img"></svg><svg id="leader" aria-hidden="true"><polyline id="callout-line" fill="none" stroke="#65d6d0" stroke-width="1"/><circle id="callout-dot" r="3" fill="#65d6d0"/></svg><script>
 const send=(type,extra={})=>parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
-send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:278});
+send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:360});
 const tip=document.getElementById('tip');
-function resetIntel(){tip.replaceChildren();tip.textContent='Hover to inspect · click for country briefing';tip.style.left='5px';tip.style.top='5px';}
-function positionIntel(e){const w=document.body.clientWidth,h=258;let x=e.clientX+12;if(x+tip.offsetWidth>w-5)x=e.clientX-tip.offsetWidth-12;x=Math.max(5,Math.min(x,w-tip.offsetWidth-5));tip.style.left=x+'px';tip.style.top=Math.max(5,Math.min(e.clientY+8,h-tip.offsetHeight-5))+'px';}
+function calloutLayout(width){const card=Math.min(340,Math.max(280,width*.38));return width>=640?{x:width-card-6,y:14,cx:(width-card-24)/2,card:card,mobile:false}:{x:6,y:368,cx:width/2,card:width-12,mobile:true};}
+function resetIntel(){tip.replaceChildren();tip.style.display='none';document.getElementById('leader').style.display='none';send('streamlit:setFrameHeight',{height:360});}
+function positionIntel(e){
+ const width=document.body.clientWidth,layout=calloutLayout(width);
+ tip.style.display='block';tip.style.left=layout.x+'px';tip.style.top=layout.y+'px';tip.style.width=layout.card+'px';
+ const leader=document.getElementById('leader'),line=document.getElementById('callout-line'),dot=document.getElementById('callout-dot');
+ leader.style.display='block';const endX=layout.mobile?layout.x+20:layout.x-3,endY=layout.mobile?layout.y:layout.y+Math.min(tip.offsetHeight/2,110);
+ line.setAttribute('points',layout.mobile?`${e.clientX},${e.clientY} ${endX},350 ${endX},${endY}`:`${e.clientX},${e.clientY} ${endX-16},${endY} ${endX},${endY}`);
+ dot.setAttribute('cx',e.clientX);dot.setAttribute('cy',e.clientY);
+ const fullHeight=Math.max(360,layout.y+tip.offsetHeight+10);leader.style.height=fullHeight+'px';send('streamlit:setFrameHeight',{height:fullHeight});
+}
 function showIntel(e,d){
  const info=d.properties.intel||{},focus=info.focus||'All',tone=focus==='Conflicts'?'#ca6976':focus==='Elections'?'#c7a15d':'#40e0d0';tip.replaceChildren();
  const add=(tag,text,cls)=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;tip.appendChild(el);return el;};
  add('div',(focus==='All'?'COUNTRY INTELLIGENCE':focus.toUpperCase()+' FOCUS'),'eyebrow').style.color=tone;
  add('strong',d.properties.Country);add('div',(info.reports||0)+' matched reports · selected story window','detail');
  if(focus==='Elections'){
-  if(info.election){add('div',info.election.name,'headline');add('div',info.election.date+' · '+info.election.days+' days to vote','detail');add('div','Wikidata calendar · verify with election authority','foot');}
+  if(info.election){add('div',info.election.name.slice(0,90),'headline');add('div',info.election.date+' · '+info.election.days+' days to vote','detail');add('div','Wikidata calendar · verify with election authority','foot');}
   else add('div','No upcoming national vote in connected calendar','detail');
   add('div','Official polls/results not connected','foot');
  }
@@ -1364,19 +1373,19 @@ function showIntel(e,d){
   info.bars.forEach((v,i)=>{const bar=document.createElement('span');bar.className='bar';bar.style.height=Math.max(2,v/max*22)+'px';bar.style.background=tone;bar.title=info.barDates[i]+': '+v+' reports';chart.appendChild(bar);});
   add('div',info.barDates[0]+' — '+info.barDates[6]+' · selected window only','foot');
  }
- (info.headlines||[]).slice(0,focus==='Elections'?1:2).forEach(r=>{add('div',r.title,'headline');add('div',r.source+' · '+r.time,'foot');});
+ (info.headlines||[]).slice(0,calloutLayout(document.body.clientWidth).mobile?1:2).forEach(r=>{add('div',r.title.slice(0,105),'headline');add('div',r.source.slice(0,45)+' · '+r.time,'foot');});
  if(!(info.headlines||[]).length)add('div','No matching retrieved headlines','detail');
  add('div','Click country to open full briefing','foot');positionIntel(e);
 }
 let args,rotation=[-15,-20],draw,lastRegion;
-addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;if(args.region!==lastRegion){rotation=[-args.center[1],-args.center[0]];lastRegion=args.region;}
+addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;resetIntel();if(args.region!==lastRegion){rotation=[-args.center[1],-args.center[0]];lastRegion=args.region;}
 if(!window.d3){document.getElementById('tip').textContent='Globe unavailable — use Flat map or country search';return;}
-const width=document.body.clientWidth,height=258,r=Math.min(width/2-18,116),svg=d3.select('svg').attr('viewBox',`0 0 ${width} ${height}`);svg.selectAll('*').remove();
-const projection=d3.geoOrthographic().translate([width/2,height/2]).scale(r).rotate(rotation).clipAngle(90),path=d3.geoPath(projection);
+const width=document.body.clientWidth,height=360,r=Math.min((calloutLayout(width).mobile?width:width-calloutLayout(width).card-24)/2-16,164),svg=d3.select('#globe').attr('viewBox',`0 0 ${width} ${height}`);svg.selectAll('*').remove();
+const projection=d3.geoOrthographic().translate([calloutLayout(width).cx,height/2]).scale(r).rotate(rotation).clipAngle(90),path=d3.geoPath(projection);
 const defs=svg.append('defs'),grad=defs.append('radialGradient').attr('id','ocean');grad.append('stop').attr('offset','0%').attr('stop-color','#13394b');grad.append('stop').attr('offset','100%').attr('stop-color','#071420');
-svg.append('circle').attr('cx',width/2).attr('cy',height/2).attr('r',r+5).attr('fill','none').attr('stroke','#29bdb655').attr('stroke-width',3);
-svg.append('circle').attr('cx',width/2).attr('cy',height/2).attr('r',r+10).attr('fill','none').attr('stroke','#315266').attr('stroke-width',.6).attr('stroke-dasharray','2 8');
-[0,90,180,270].forEach(a=>{const rad=a*Math.PI/180;svg.append('line').attr('x1',width/2+Math.cos(rad)*(r+6)).attr('y1',height/2+Math.sin(rad)*(r+6)).attr('x2',width/2+Math.cos(rad)*(r+12)).attr('y2',height/2+Math.sin(rad)*(r+12)).attr('stroke','#80a7b9').attr('stroke-width',1);});
+svg.append('circle').attr('cx',calloutLayout(width).cx).attr('cy',height/2).attr('r',r+5).attr('fill','none').attr('stroke','#29bdb655').attr('stroke-width',3);
+svg.append('circle').attr('cx',calloutLayout(width).cx).attr('cy',height/2).attr('r',r+10).attr('fill','none').attr('stroke','#315266').attr('stroke-width',.6).attr('stroke-dasharray','2 8');
+[0,90,180,270].forEach(a=>{const rad=a*Math.PI/180;svg.append('line').attr('x1',calloutLayout(width).cx+Math.cos(rad)*(r+6)).attr('y1',height/2+Math.sin(rad)*(r+6)).attr('x2',calloutLayout(width).cx+Math.cos(rad)*(r+12)).attr('y2',height/2+Math.sin(rad)*(r+12)).attr('stroke','#80a7b9').attr('stroke-width',1);});
 svg.append('path').datum({type:'Sphere'}).attr('fill','url(#ocean)').attr('stroke','#487587');
 svg.append('path').datum(d3.geoGraticule10()).attr('fill','none').attr('stroke','#2c5265').attr('stroke-width',.4);
 const features=args.features.map(f=>{const g=JSON.parse(JSON.stringify(f));const polys=g.geometry.type==='Polygon'?[g.geometry.coordinates]:g.geometry.type==='MultiPolygon'?g.geometry.coordinates:[];polys.forEach(rings=>{if(d3.geoArea({type:'Polygon',coordinates:rings})>2*Math.PI)rings.forEach(ring=>ring.reverse());});return g;});
@@ -1462,7 +1471,6 @@ def country_hover_details(code,items,election_rows,catalog,layer,already_matched
 
 def world_monitor(items):
     st.markdown('<div class="monitor-heading">WORLD MONITOR</div>',unsafe_allow_html=True)
-    st.caption("MONITOR FOCUS")
     controls,selector,settings=st.columns([2,2,1])
     layer=controls.radio("MAP LAYER",["All","Conflicts","Elections"],horizontal=True,key="world_layer",label_visibility="collapsed")
     catalog=country_catalog()
@@ -1472,6 +1480,7 @@ def world_monitor(items):
         if selection and st.button("OPEN COUNTRY ↗",key="open_picked_country",use_container_width=True):open_country(selection)
     with settings.popover("⚙",use_container_width=True):
         map_view=st.radio("Display",["Globe","Flat map"],horizontal=True,key="monitor_display")
+        coverage_slot=st.container()
         region=st.selectbox("Map region",["World","Europe","Middle East","Americas","Asia-Pacific","Africa"],key="map_region")
         favourites=st.multiselect("Favourite countries",ordered,default=st.session_state.get("saved_country_favourites",[]),format_func=lambda code:catalog[code]["name"],max_selections=6,key="country_favourites")
         st.session_state.saved_country_favourites=list(favourites)
@@ -1556,19 +1565,13 @@ def world_monitor(items):
         st.info("Map boundaries are unavailable. Select a country above to open its briefing.")
     legend={"All":'<span style="color:#ca6976">● Conflict reporting</span> &nbsp; <span style="color:#c7a15d">● Election news / dates</span> &nbsp; <span style="color:#8b8296">● Both</span> &nbsp; <span style="color:#40e0d0">● Other coverage</span>',"Conflicts":'<span style="color:#ca6976">● Conflicts active · matching reporting</span>',"Elections":'<span style="color:#c7a15d">● Elections active · matching reporting / national vote dates</span>'}[layer]
     st.markdown('<div style="font-size:.7rem;line-height:1.7">'+legend+'</div>',unsafe_allow_html=True)
-    st.caption("Click a country for its briefing · colours show retrieved reporting and calendar coverage")
-    with st.popover("MAP INFORMATION & COVERAGE"):
-        st.caption("Conflict highlights use keyword-matched reporting, not verified war-zone boundaries. Mentions can concern several countries; no highlight does not establish absence of conflict or elections.")
-        if calendar_error:st.caption("Election calendar unavailable on this check; news remains available.")
-        for code in sorted(counts,key=counts.get,reverse=True)[:8]:
-            if st.button(f'{catalog[code]["name"]} · {counts[code]} reports',key="country_shortcut_"+code,use_container_width=True):open_country(code)
-    with st.expander("ELECTION DATES / SOURCES",expanded=False):
-        upcoming=election_countdowns(calendar_rows)
-        if upcoming:
-            st.dataframe(pd.DataFrame(upcoming[:12]),hide_index=True,use_container_width=True,column_config={"Source":st.column_config.LinkColumn("Source ↗")})
-        else:
-            st.caption("No upcoming calendar entries available on this check.")
-        st.caption("National elections only · Wikidata community-maintained calendar · six-hour cache · verify dates at election authorities. Polls/results require original verified sources. Map boundaries: world.geo.json / Natural Earth; boundaries are illustrative.")
+    with coverage_slot:
+        with st.expander("Coverage / election dates",expanded=False):
+            st.caption("Highlights use country mentions in retrieved reporting, not verified war-zone boundaries or risk ratings. No highlight does not establish absence of events.")
+            if calendar_error:st.caption("Election calendar unavailable on this check.")
+            upcoming=election_countdowns(calendar_rows)
+            if upcoming:st.dataframe(pd.DataFrame(upcoming[:12]),hide_index=True,use_container_width=True,column_config={"Source":st.column_config.LinkColumn("Source ↗")})
+            st.caption("National votes: Wikidata calendar; verify with election authorities. Boundaries: world.geo.json / Natural Earth, illustrative.")
 
 
 def update_overview_changes(items, previous=None):
@@ -1638,7 +1641,6 @@ def overview_panel(items, errors, change_items=None):
     with st.container(key="overview_pulse_tight"):
         compact_pulse()
     with st.container(key="explore_desks"):
-        st.markdown('<span class="desk-label">EXPLORE DESKS</span>',unsafe_allow_html=True)
         for col,channel in zip(st.columns(6),["World","Politics","Conflicts","Elections","Economic Calendar","Markets"]):
             label="CALENDAR" if channel=="Economic Calendar" else channel.upper()
             col.button(label+" ↗",key="branch_"+channel,on_click=overview_navigate,args=(channel,),use_container_width=True)
@@ -2016,7 +2018,7 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-10")
+    st.caption("REVISION 2026.10.22-11")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"],key="channel")
     news_scope=st.selectbox("NEWS COVERAGE",["Major developments","All reporting"],key="news_scope",help="Keyword-based filter for policy, elections, conflicts and major economic developments. Sports keeps its own coverage. Choose All reporting for broader coverage.")
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
