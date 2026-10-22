@@ -26,9 +26,17 @@ st.set_page_config(page_title="INTELLIGENCE HUB", page_icon="◈", layout="wide"
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
-.overview-title{font:600 1.6rem Oxanium,monospace;letter-spacing:2px;margin:4px 0 16px}.overview-title span{font:11px monospace;color:#91a8ba;letter-spacing:1px;margin-left:20px}
+
+/* Operations-room treatment: restrained instrumentation, readable text. */
+.st-key-overview_command{position:relative;border:1px solid #284557;border-radius:5px;padding:14px 16px 10px;background:linear-gradient(135deg,#0c1c2999,#07111c55);box-shadow:inset 0 1px 0 #5babb517,0 12px 35px #0002}
+.st-key-overview_command:before,.st-key-overview_command:after{content:"";position:absolute;width:14px;height:14px;pointer-events:none;z-index:1}.st-key-overview_command:before{top:-1px;left:-1px;border-top:2px solid #55d5d0;border-left:2px solid #55d5d0}.st-key-overview_command:after{bottom:-1px;right:-1px;border-bottom:2px solid #55d5d0;border-right:2px solid #55d5d0}
+.st-key-overview_wire{border:1px solid #223c4d;border-top:2px solid #357984;border-radius:4px;padding:12px 16px;background:#09162188;margin-top:12px}
+.ops-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#809fae;font:10px monospace;letter-spacing:1px;margin:0 0 8px}.ops-strip strong{color:#68d3ce;font-weight:400}.ops-dot{display:inline-block;width:5px;height:5px;background:#57c6bc;border-radius:50%;margin-right:6px;box-shadow:0 0 7px #40e0d055}.monitor-heading{color:#d6e9f5;text-shadow:0 0 12px #2ac4d01a}.focus-label{border-left:2px solid currentColor;padding-left:8px}.ticker-strip{box-shadow:inset 0 1px 0 #6bd0d00c}.intel-row{border-top-color:#31506488}.wire-row:hover{background:#15314366}.st-key-explore_desks button:hover{border-color:#62c5cc!important;background:#173447!important}
+@media(max-width:700px){.ops-strip{font-size:9px;letter-spacing:0;flex-wrap:wrap}.st-key-overview_command,.st-key-overview_wire{padding:10px}}
+
+.st-key-explore_desks{max-width:850px}.st-key-explore_desks [data-testid="stHorizontalBlock"]{gap:6px!important}.st-key-explore_desks [data-testid="stVerticalBlock"]{gap:3px!important}.st-key-explore_desks button{min-height:25px!important;padding:1px 8px!important;border-color:#29435488!important;background:#10233266!important}.st-key-explore_desks button p{font-size:10px!important;letter-spacing:.5px}.intel-preview{font:11px/1.5 Oxanium,sans-serif;color:#92aabb;margin:0 0 4px}.wire-sub{font:9px monospace;color:#7896a9;letter-spacing:1px;margin-left:14px}.wire-row{display:flex;gap:12px;border-top:1px solid #203645;padding:9px 0}.wire-index{font-size:11px;color:#426c82;padding-top:3px}.wire-headline{font:12px/1.5 Oxanium,sans-serif;color:#dbeaf5}.wire-meta{font:10px monospace;color:#87a1b4}.st-key-overview_wire .stButton button,.st-key-overview_wire .stLinkButton a{min-height:26px;padding:2px 8px;font-size:10px}.st-key-overview_wire [data-testid="stVerticalBlock"]{gap:5px}.desk-label{font-size:9px;color:#8398a7;letter-spacing:1px}.overview-title{font:600 1.6rem Oxanium,monospace;letter-spacing:2px;margin:4px 0 16px}.overview-title span{font:11px monospace;color:#91a8ba;letter-spacing:1px;margin-left:20px}
 .ticker-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid #294354;border-radius:6px;background:#0b1823;margin-top:8px}.ticker-cell{padding:9px 12px;border-right:1px solid #294354;min-width:0}.ticker-cell:last-child{border:0}.ticker-name{font:11px Oxanium,monospace;color:#a8bfd1}.ticker-value{font-size:16px;white-space:nowrap}.ticker-value small{font-size:11px}.ticker-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#8ca5b7}.ticker-bottom svg{width:65px;height:24px;flex-shrink:0}.intel-row{padding:6px 0 0;border-top:1px solid #213b4b;font-size:13px;line-height:1.45}.intel-row .tag{font-size:10px}.monitor-heading{font:600 15px Oxanium,monospace;letter-spacing:1px;margin:8px 0}.focus-label{font:11px monospace;margin:8px 0 12px}.st-key-overview_command [data-testid="stCaptionContainer"]{font-size:11px}.st-key-overview_command .stButton button{min-height:26px;padding:2px 10px;font-size:11px}.st-key-overview_command [data-testid="stVerticalBlock"]{gap:.5rem}
-@media(max-width:700px){.ticker-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.ticker-cell{padding:8px}.ticker-value{font-size:13px}.ticker-value small{font-size:10px}.ticker-bottom svg{width:35px}.overview-title span{display:block;margin:8px 0 0}.st-key-overview_command [data-testid="stHorizontalBlock"]{flex-wrap:wrap}.st-key-overview_command [data-testid="stColumn"]{min-width:100%!important}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child{order:2}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child{order:1}}
+@media(max-width:700px){.st-key-explore_desks [data-testid="stHorizontalBlock"]{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}.st-key-explore_desks [data-testid="stColumn"]{min-width:0!important;width:auto!important}.ticker-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.ticker-cell{padding:8px}.ticker-value{font-size:13px}.ticker-value small{font-size:10px}.ticker-bottom svg{width:35px}.overview-title span{display:block;margin:8px 0 0}.st-key-overview_command [data-testid="stHorizontalBlock"]{flex-wrap:wrap}.st-key-overview_command [data-testid="stColumn"]{min-width:100%!important}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child{order:2}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child{order:1}}
 
 html, body, [class*="css"], [data-testid="stApp"] {font-family:'Share Tech Mono',monospace;}
 h1,h2,h3,[data-testid="stMetricLabel"],button,p label {font-family:'Oxanium',monospace!important;}
@@ -1329,25 +1337,52 @@ def globe_component():
     return declare_component("intel_globe",path=str(directory))
 
 
-GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}svg{display:block;width:100%;touch-action:none;cursor:grab}svg:active{cursor:grabbing}#tip{position:absolute;top:12px;left:12px;pointer-events:none;background:#102537dd;padding:8px;border-radius:4px}#help{text-align:center;font-size:11px;color:#8299ab}</style></head><body><div id="tip">Drag to rotate · click a country</div><svg aria-label="Interactive world globe" role="img"></svg><div id="help">Country search above also opens any briefing</div><script>
+GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}svg{display:block;width:100%;touch-action:none;cursor:grab}svg:active{cursor:grabbing}#tip{position:absolute;top:5px;left:5px;pointer-events:none;background:#0c1c2af5;padding:10px;border-radius:5px;border:1px solid #31566a;box-shadow:0 5px 20px #0005;width:238px;max-width:calc(100% - 10px);max-height:278px;overflow:hidden;box-sizing:border-box;font-size:10px;line-height:1.4;z-index:2}#tip strong{font-size:13px;color:#dceef9;display:block;letter-spacing:.7px}#tip .eyebrow{font-size:9px;letter-spacing:1px;margin-bottom:4px}#tip .detail{color:#9ab0c0;margin:4px 0}#tip .headline{border-top:1px solid #294354;margin-top:6px;padding-top:5px;color:#d5e4ee}#tip .bars{display:flex;height:22px;align-items:flex-end;gap:3px;margin-top:5px}#tip .bar{flex:1;min-height:2px;opacity:.75}#tip .foot{font-size:9px;color:#849eaf;margin-top:5px}#help{text-align:center;font-size:11px;color:#8299ab}</style></head><body><div id="tip">Hover to inspect · drag to rotate</div><svg aria-label="Interactive world globe" role="img"></svg><div id="help">Country search above also opens any briefing</div><script>
 const send=(type,extra={})=>parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
 send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:320});
+const tip=document.getElementById('tip');
+function resetIntel(){tip.replaceChildren();tip.textContent='Hover to inspect · click for country briefing';tip.style.left='5px';tip.style.top='5px';}
+function positionIntel(e){const w=document.body.clientWidth,h=292;let x=e.clientX+12;if(x+tip.offsetWidth>w-5)x=e.clientX-tip.offsetWidth-12;x=Math.max(5,Math.min(x,w-tip.offsetWidth-5));tip.style.left=x+'px';tip.style.top=Math.max(5,Math.min(e.clientY+8,h-tip.offsetHeight-5))+'px';}
+function showIntel(e,d){
+ const info=d.properties.intel||{},focus=info.focus||'All',tone=focus==='Conflicts'?'#ca6976':focus==='Elections'?'#c7a15d':'#40e0d0';tip.replaceChildren();
+ const add=(tag,text,cls)=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;tip.appendChild(el);return el;};
+ add('div',(focus==='All'?'COUNTRY INTELLIGENCE':focus.toUpperCase()+' FOCUS'),'eyebrow').style.color=tone;
+ add('strong',d.properties.Country);add('div',(info.reports||0)+' matched reports · selected story window','detail');
+ if(focus==='Elections'){
+  if(info.election){add('div',info.election.name,'headline');add('div',info.election.date+' · '+info.election.days+' days to vote','detail');add('div','Wikidata calendar · verify with election authority','foot');}
+  else add('div','No upcoming national vote in connected calendar','detail');
+  add('div','Official polls/results not connected','foot');
+ }
+ if((info.bars||[]).some(n=>n>0)){
+  add('div','Retrieved reports by publication day (UTC)','foot');const chart=add('div','','bars'),max=Math.max(...info.bars,1);
+  info.bars.forEach((v,i)=>{const bar=document.createElement('span');bar.className='bar';bar.style.height=Math.max(2,v/max*22)+'px';bar.style.background=tone;bar.title=info.barDates[i]+': '+v+' reports';chart.appendChild(bar);});
+  add('div',info.barDates[0]+' — '+info.barDates[6]+' · selected window only','foot');
+ }
+ (info.headlines||[]).forEach(r=>{add('div',r.title,'headline');add('div',r.source+' · '+r.time,'foot');});
+ if(!(info.headlines||[]).length)add('div','No matching retrieved headlines','detail');
+ add('div','Click country to open full briefing','foot');positionIntel(e);
+}
 let args,rotation=[-15,-20],draw,lastRegion;
 addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;if(args.region!==lastRegion){rotation=[-args.center[1],-args.center[0]];lastRegion=args.region;}
 if(!window.d3){document.getElementById('tip').textContent='Globe unavailable — use Flat map or country search';return;}
 const width=document.body.clientWidth,height=292,r=Math.min(width/2-18,136),svg=d3.select('svg').attr('viewBox',`0 0 ${width} ${height}`);svg.selectAll('*').remove();
+for(let x=20;x<width;x+=40)svg.append('line').attr('x1',x).attr('x2',x).attr('y1',10).attr('y2',height-10).attr('stroke','#1e3e4e').attr('stroke-width',.35).attr('opacity',.35);
+for(let y=26;y<height;y+=40)svg.append('line').attr('x1',10).attr('x2',width-10).attr('y1',y).attr('y2',y).attr('stroke','#1e3e4e').attr('stroke-width',.35).attr('opacity',.35);
 const projection=d3.geoOrthographic().translate([width/2,height/2]).scale(r).rotate(rotation).clipAngle(90),path=d3.geoPath(projection);
 const defs=svg.append('defs'),grad=defs.append('radialGradient').attr('id','ocean');grad.append('stop').attr('offset','0%').attr('stop-color','#13394b');grad.append('stop').attr('offset','100%').attr('stop-color','#071420');
 svg.append('circle').attr('cx',width/2).attr('cy',height/2).attr('r',r+5).attr('fill','none').attr('stroke','#29bdb655').attr('stroke-width',3);
+svg.append('circle').attr('cx',width/2).attr('cy',height/2).attr('r',r+10).attr('fill','none').attr('stroke','#315266').attr('stroke-width',.6).attr('stroke-dasharray','2 8');
+[0,90,180,270].forEach(a=>{const rad=a*Math.PI/180;svg.append('line').attr('x1',width/2+Math.cos(rad)*(r+6)).attr('y1',height/2+Math.sin(rad)*(r+6)).attr('x2',width/2+Math.cos(rad)*(r+12)).attr('y2',height/2+Math.sin(rad)*(r+12)).attr('stroke','#80a7b9').attr('stroke-width',1);});
 svg.append('path').datum({type:'Sphere'}).attr('fill','url(#ocean)').attr('stroke','#487587');
 svg.append('path').datum(d3.geoGraticule10()).attr('fill','none').attr('stroke','#2c5265').attr('stroke-width',.4);
 const features=args.features.map(f=>{const g=JSON.parse(JSON.stringify(f));const polys=g.geometry.type==='Polygon'?[g.geometry.coordinates]:g.geometry.type==='MultiPolygon'?g.geometry.coordinates:[];polys.forEach(rings=>{if(d3.geoArea({type:'Polygon',coordinates:rings})>2*Math.PI)rings.forEach(ring=>ring.reverse());});return g;});
 svg.selectAll('.country').data(features).enter().append('path').attr('class','country').attr('fill',d=>d.properties.fill).attr('fill-opacity',d=>d.properties.highlight?.58:.35).attr('stroke','#567889').attr('stroke-width',.45)
-.on('mouseenter',function(e,d){d3.select(this).attr('stroke','#d4ffff').attr('stroke-width',1.5);document.getElementById('tip').textContent=d.properties.Country+' · '+d.properties.Articles+' retrieved reports';})
-.on('mouseleave',function(){d3.select(this).attr('stroke','#567889').attr('stroke-width',.45);})
+.on('mouseenter',function(e,d){d3.select(this).attr('stroke','#d4ffff').attr('stroke-width',1.5);showIntel(e,d);})
+.on('mousemove',function(e,d){positionIntel(e);})
+.on('mouseleave',function(){d3.select(this).attr('stroke','#567889').attr('stroke-width',.45);resetIntel();})
 .on('click',(e,d)=>{if(e.defaultPrevented)return;send('streamlit:setComponentValue',{value:{code:d.properties.code,nonce:Date.now()},dataType:'json'});});
 draw=()=>svg.selectAll('path').attr('d',path);draw();
-svg.call(d3.drag().on('drag',e=>{rotation=[rotation[0]+e.dx*.35,Math.max(-80,Math.min(80,rotation[1]-e.dy*.35))];projection.rotate(rotation);draw();}));
+svg.call(d3.drag().on('start',()=>resetIntel()).on('drag',e=>{rotation=[rotation[0]+e.dx*.35,Math.max(-80,Math.min(80,rotation[1]-e.dy*.35))];projection.rotate(rotation);draw();}));
 });</script></body></html>"""
 
 
@@ -1368,6 +1403,9 @@ def overview_developments(items):
         item=group[0]
         st.markdown('<div class="intel-row"><span class="tag">'+escape(item['category'].upper())+'</span><div>'+escape(item['title'])+'</div></div>',unsafe_allow_html=True)
         st.caption(item['source']+' · '+timestamp(item['published']))
+        summary=short_preview(item.get('summary',''),24)
+        if summary and summary.casefold()!=item['title'].casefold():
+            st.markdown('<div class="intel-preview">'+escape(summary)+'</div>',unsafe_allow_html=True)
         if st.button("BRIEF ↗",key="focus_brief_"+str(index)):story_dialog(item)
     if layer=="Elections":
         rows,error=elections_calendar()
@@ -1406,6 +1444,16 @@ def compact_pulse():
         cells.append(f'<div class="ticker-cell" title="{escape(market_freshness(frame),quote=True)}"><span class="ticker-name">{escape(name)}</span><div class="ticker-value">{value} <small style="color:{tone}">{delta}</small></div><div class="ticker-bottom"><span>{escape(unit)}</span><svg viewBox="0 0 100 28" aria-hidden="true"><polyline points="{points}" fill="none" stroke="{tone}" stroke-width="1.6"/></svg></div></div>')
     st.markdown('<div class="ticker-strip">'+''.join(cells)+'</div>',unsafe_allow_html=True)
     st.caption("MARKET PULSE · delayed daily quotes",help="Yahoo Finance daily closes · 1M sparklines · metals/oil futures · gold/silver EUR per gram, oil EUR per barrel · EUR estimates use historical daily FX. Hover a quote for its source date; open Markets or Commodities for full charts.")
+
+
+def country_hover_details(code,items,election_rows,catalog,layer):
+    matches=[item for item in monitor_reports(items,layer) if code in country_mentions(item.get("title","")+" "+item.get("summary",""),catalog)]
+    matches=sorted(matches,key=lambda row:row.get("published") or "",reverse=True)
+    today=datetime.now(UTC).date()
+    days=[today-timedelta(days=i) for i in range(6,-1,-1)]
+    daily=[sum(1 for row in matches if (row.get("published") or "")[:10]==day.isoformat()) for day in days]
+    dates=election_countdowns(election_rows)
+    return {"focus":layer,"reports":len(matches),"headlines":[{"title":row["title"][:108]+("…" if len(row["title"])>108 else ""),"source":row["source"],"time":timestamp(row.get("published"))} for row in matches[:2]],"bars":daily,"barDates":[day.strftime("%d %b") for day in days],"election":({"name":dates[0].get("Election","National election"),"date":dates[0]["Date"],"days":dates[0]["Days to vote"]} if dates else None)}
 
 
 def world_monitor(items):
@@ -1459,6 +1507,10 @@ def world_monitor(items):
         for longitude in range(-180,181,30):
             folium.PolyLine([[-80,longitude],[85,longitude]],color="#183040",weight=.5,opacity=.6,interactive=False).add_to(m)
         features=[]
+        focused_items=monitor_reports(items,layer)
+        hover_by_country={}
+        for report in focused_items:
+            for code in country_mentions(report.get("title","")+" "+report.get("summary",""),catalog):hover_by_country.setdefault(code,[]).append(report)
         for original in data["features"]:
             f=dict(original)
             props=dict(f["properties"])
@@ -1474,6 +1526,7 @@ def world_monitor(items):
             props["fill"]=("#ca6976" if conflict else "#102537") if layer=="Conflicts" else ("#c7a15d" if election else "#102537") if layer=="Elections" else map_highlight(conflict,election,props["Articles"])
             dates=election_countdowns(elections.get(code,[]))
             props["Next national vote"]=f'{dates[0]["Date"]} · {dates[0]["Days to vote"]} days' if dates else "No calendar entry"
+            props["intel"]=country_hover_details(code,hover_by_country.get(code,[]),elections.get(code,[]),catalog,layer)
             f["properties"]=props
             features.append(f)
         boundaries={"type":"FeatureCollection","features":features}
@@ -1575,35 +1628,34 @@ def overview_panel(items, errors, change_items=None):
         country_monitor(st.session_state.monitor_country)
         return
     items=[r for r in items if r["category"]!="Sports"]
+    now=datetime.now(UTC)
+    st.markdown('<div class="ops-strip"><span><span class="ops-dot"></span><strong>GLOBAL SITUATION DESK</strong> / '+escape(st.session_state.get("news_scope","Major developments").upper())+'</span><span>'+now.strftime("%d %b %Y · %H:%M UTC")+' / '+now.astimezone(ZoneInfo("Europe/Malta")).strftime("%H:%M MALTA")+'</span></div>',unsafe_allow_html=True)
     overview_changes(items if change_items is None else change_items,items)
     compact_pulse()
-    st.caption("EXPLORE DESKS")
-    for col,channel in zip(st.columns(6),["World","Politics","Conflicts","Elections","Economic Calendar","Markets"]):
-        col.button(channel.upper()+" ↗",key="branch_"+channel,on_click=overview_navigate,args=(channel,),use_container_width=True)
+    with st.container(key="explore_desks"):
+        st.markdown('<span class="desk-label">EXPLORE DESKS</span>',unsafe_allow_html=True)
+        for col,channel in zip(st.columns(6),["World","Politics","Conflicts","Elections","Economic Calendar","Markets"]):
+            label="CALENDAR" if channel=="Economic Calendar" else channel.upper()
+            col.button(label+" ↗",key="branch_"+channel,on_click=overview_navigate,args=(channel,),use_container_width=True)
     with st.container(key="overview_command"):
         globe,developments=st.columns([1.8,1],gap="medium")
         with globe:world_monitor(items)
         with developments:overview_developments(items)
-    st.subheader("LATEST INTELLIGENCE")
-    channels = ["All", "World", "Politics", "Elections", "Conflicts", "Markets"]
-    for tab, channel in zip(st.tabs(channels), channels):
-        with tab:
-            selected = items if channel == "All" else [a for a in items if a["category"] == channel]
-            groups=group_reporting(selected)
-            selected=[g[0] for g in groups]
-            if not selected:
-                st.caption("No matching stories in this window.")
-            for offset in range(0, min(6, len(selected)), 2):
-                for card_index, (col, item) in enumerate(zip(st.columns(2), selected[offset:offset+2]), start=offset):
-                    with col, st.container(border=True):
-                        st.markdown(f'<div class="tag">{escape(item["category"].upper())}</div><div class="sport-headline">{escape(item["title"])}</div>', unsafe_allow_html=True)
-                        st.caption(f'{item["source"]} · {timestamp(item["published"])}')
-                        a, b = st.columns(2)
-                        uid = hashlib.sha256(item["url"].encode()).hexdigest()[:16]
-                        if a.button("OPEN BRIEF", key=f"ov_{channel}_{card_index}_{uid}", use_container_width=True):
-                            story_dialog(item)
-                        b.link_button("SOURCE ↗", item["url"], use_container_width=True)
-                        related_reports(groups[card_index],scope=f"ov_{channel}_{card_index}")
+    with st.container(key="overview_wire"):
+        st.markdown('<div class="monitor-heading">INTELLIGENCE WIRE <span class="wire-sub">EXPAND YOUR COVERAGE</span></div>',unsafe_allow_html=True)
+        channel=st.radio("WIRE DESK",["All","World","Politics","Elections","Conflicts","Markets"],horizontal=True,label_visibility="collapsed",key="overview_wire_channel")
+        selected=items if channel=="All" else [row for row in items if row["category"]==channel]
+        lead_keys={report_key(row) for group in group_reporting(monitor_reports(items,st.session_state.get("world_layer","All")))[:5] for row in group}
+        groups=[group for group in group_reporting(selected) if not any(report_key(row) in lead_keys for row in group)][:8]
+        if not groups:st.caption("No additional reporting in this desk and story window.")
+        for index,group in enumerate(groups):
+            item=group[0]
+            with st.container(border=False):
+                content,brief,source=st.columns([8,1,1])
+                with content:
+                    st.markdown('<div class="wire-row"><span class="wire-index">'+f'{index+1:02d}'+'</span><div><span class="tag">'+escape(item['category'].upper())+'</span><div class="wire-headline">'+escape(item['title'])+'</div><span class="wire-meta">'+escape(item['source']+' · '+timestamp(item['published']))+'</span></div></div>',unsafe_allow_html=True)
+                if brief.button("BRIEF ↗",key="wire_brief_"+str(index),use_container_width=True):story_dialog(item)
+                source.link_button("SOURCE ↗",item['url'],use_container_width=True)
     with st.expander("FEED STATISTICS & HEALTH",expanded=False):
         health=st.session_state.get("feed_health",[])
         st.caption(f"{len(items)} retrieved articles in your filters · {sum(bool(r['Available']) for r in health)} / {len(health)} checked feeds available")
@@ -1959,7 +2011,7 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-08")
+    st.caption("REVISION 2026.10.22-09")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"],key="channel")
     news_scope=st.selectbox("NEWS COVERAGE",["Major developments","All reporting"],key="news_scope",help="Keyword-based filter for policy, elections, conflicts and major economic developments. Sports keeps its own coverage. Choose All reporting for broader coverage.")
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
@@ -1970,7 +2022,7 @@ with st.sidebar:
 
 
 if section == "Overview":
-    st.markdown('<div class="tag">GLOBAL MONITORING / PERSONAL TERMINAL</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tag">GLOBAL OPERATIONS / OPEN-SOURCE INTELLIGENCE</div>', unsafe_allow_html=True)
     st.markdown('<div class="overview-title">INTELLIGENCE HUB <span>WORLD / POLICY / CONFLICT / ECONOMY</span></div>',unsafe_allow_html=True)
 else:
     st.markdown('<div class="mini-brand">◈ INTELLIGENCE HUB</div>', unsafe_allow_html=True)
