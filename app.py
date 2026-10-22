@@ -26,6 +26,10 @@ st.set_page_config(page_title="INTELLIGENCE HUB", page_icon="◈", layout="wide"
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+.overview-title{font:600 1.6rem Oxanium,monospace;letter-spacing:2px;margin:4px 0 16px}.overview-title span{font:11px monospace;color:#91a8ba;letter-spacing:1px;margin-left:20px}
+.ticker-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid #294354;border-radius:6px;background:#0b1823;margin-top:8px}.ticker-cell{padding:9px 12px;border-right:1px solid #294354;min-width:0}.ticker-cell:last-child{border:0}.ticker-name{font:11px Oxanium,monospace;color:#a8bfd1}.ticker-value{font-size:16px;white-space:nowrap}.ticker-value small{font-size:11px}.ticker-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#8ca5b7}.ticker-bottom svg{width:65px;height:24px;flex-shrink:0}.intel-row{padding:8px 0 0;border-top:1px solid #213b4b;font-size:13px;line-height:1.45}.intel-row .tag{font-size:10px}
+@media(max-width:700px){.ticker-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.ticker-cell{padding:8px}.ticker-value{font-size:13px}.ticker-value small{font-size:10px}.ticker-bottom svg{width:35px}.overview-title span{display:block;margin:8px 0 0}.st-key-overview_command [data-testid="stHorizontalBlock"]{flex-wrap:wrap}.st-key-overview_command [data-testid="stColumn"]{min-width:100%!important}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child{order:2}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child{order:1}}
+
 html, body, [class*="css"], [data-testid="stApp"] {font-family:'Share Tech Mono',monospace;}
 h1,h2,h3,[data-testid="stMetricLabel"],button,p label {font-family:'Oxanium',monospace!important;}
 .stApp {background:radial-gradient(ellipse at 80% 0%,#11283a 0%,#070d17 55%);}
@@ -1314,10 +1318,87 @@ def map_highlight(conflict,election,coverage):
     return "#40e0d0" if coverage else "#102537"
 
 
+
+@st.cache_resource
+def globe_component():
+    import tempfile
+    from pathlib import Path
+    from streamlit.components.v1 import declare_component
+    directory=Path(tempfile.mkdtemp(prefix="intel_globe_"))
+    (directory/"index.html").write_text(GLOBE_HTML,encoding="utf-8")
+    return declare_component("intel_globe",path=str(directory))
+
+
+GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>body{margin:0;background:#070d17;color:#a6c0d2;font:12px monospace}svg{display:block;width:100%;touch-action:none;cursor:grab}svg:active{cursor:grabbing}#tip{position:absolute;top:12px;left:12px;pointer-events:none;background:#102537dd;padding:8px;border-radius:4px}#help{text-align:center;font-size:11px;color:#8299ab}</style></head><body><div id="tip">Drag to rotate · click a country</div><svg aria-label="Interactive world globe" role="img"></svg><div id="help">Country search above also opens any briefing</div><script>
+const send=(type,extra={})=>parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
+send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:400});
+let args,rotation=[-15,-20],draw,lastRegion;
+addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;if(args.region!==lastRegion){rotation=[-args.center[1],-args.center[0]];lastRegion=args.region;}
+if(!window.d3){document.getElementById('tip').textContent='Globe unavailable — use Flat map or country search';return;}
+const width=document.body.clientWidth,height=370,r=Math.min(width/2-18,174),svg=d3.select('svg').attr('viewBox',`0 0 ${width} ${height}`);svg.selectAll('*').remove();
+const projection=d3.geoOrthographic().translate([width/2,height/2]).scale(r).rotate(rotation).clipAngle(90),path=d3.geoPath(projection);
+const defs=svg.append('defs'),grad=defs.append('radialGradient').attr('id','ocean');grad.append('stop').attr('offset','0%').attr('stop-color','#13394b');grad.append('stop').attr('offset','100%').attr('stop-color','#071420');
+svg.append('circle').attr('cx',width/2).attr('cy',height/2).attr('r',r+5).attr('fill','none').attr('stroke','#29bdb655').attr('stroke-width',3);
+svg.append('path').datum({type:'Sphere'}).attr('fill','url(#ocean)').attr('stroke','#487587');
+svg.append('path').datum(d3.geoGraticule10()).attr('fill','none').attr('stroke','#2c5265').attr('stroke-width',.4);
+const features=args.features.map(f=>{const g=JSON.parse(JSON.stringify(f));const polys=g.geometry.type==='Polygon'?[g.geometry.coordinates]:g.geometry.type==='MultiPolygon'?g.geometry.coordinates:[];polys.forEach(rings=>{if(d3.geoArea({type:'Polygon',coordinates:rings})>2*Math.PI)rings.forEach(ring=>ring.reverse());});return g;});
+svg.selectAll('.country').data(features).enter().append('path').attr('class','country').attr('fill',d=>d.properties.fill).attr('fill-opacity',d=>d.properties.highlight?.85:.5).attr('stroke','#567889').attr('stroke-width',.45)
+.on('mouseenter',function(e,d){d3.select(this).attr('stroke','#d4ffff').attr('stroke-width',1.5);document.getElementById('tip').textContent=d.properties.Country+' · '+d.properties.Articles+' retrieved reports';})
+.on('mouseleave',function(){d3.select(this).attr('stroke','#567889').attr('stroke-width',.45);})
+.on('click',(e,d)=>{if(e.defaultPrevented)return;send('streamlit:setComponentValue',{value:{code:d.properties.code,nonce:Date.now()},dataType:'json'});});
+draw=()=>svg.selectAll('path').attr('d',path);draw();
+svg.call(d3.drag().on('drag',e=>{rotation=[rotation[0]+e.dx*.35,Math.max(-80,Math.min(80,rotation[1]-e.dy*.35))];projection.rotate(rotation);draw();}));
+});</script></body></html>"""
+
+
+def overview_developments(items):
+    st.markdown("#### CURRENT DEVELOPMENTS")
+    groups=group_reporting(items)[:5]
+    if not groups:st.caption("No reporting in the selected window.")
+    for index,group in enumerate(groups):
+        item=group[0]
+        st.markdown('<div class="intel-row"><span class="tag">'+escape(item['category'].upper())+'</span><div>'+escape(item['title'])+'</div></div>',unsafe_allow_html=True)
+        st.caption(item['source']+' · '+timestamp(item['published']))
+        if st.button("READ BRIEF ↗",key="focus_brief_"+str(index)):story_dialog(item)
+    st.caption("Latest retrieved reporting · related headlines grouped · source claims remain attributed")
+
+
+def overview_navigate(channel):
+    st.session_state.channel=channel
+    st.session_state.pop("monitor_country",None)
+
+
+def compact_pulse():
+    basket={name:ASSETS[name] if name in ASSETS else MARKET_PRESETS[name] for name in ["S&P 500","Nasdaq","Gold","Silver","Brent oil","EUR / USD"]}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        frames=list(pool.map(lambda name:market_data(basket[name][0]),basket))
+    fx=market_data("EURUSD=X")
+    cells=[]
+    for (name,(symbol,unit)),frame in zip(basket.items(),frames):
+        if name in ("Gold","Silver","Brent oil"):
+            frame,unit=convert_market_quote(frame,unit,"EUR",fx)
+            if frame is not None and name in ("Gold","Silver"):
+                frame=frame.copy();frame['Close']=frame['Close']/31.1034768;unit="EUR / gram"
+            elif frame is not None:unit="EUR / barrel"
+        if frame is None or frame.empty:
+            cells.append('<div class="ticker-cell">'+escape(name)+'<br>Unavailable</div>');continue
+        close=float(frame.Close.iloc[-1]);prior=float(frame.Close.iloc[-2]) if len(frame)>1 else None
+        change=(close/prior-1)*100 if prior else None
+        tone="#40e0d0" if change is not None and change>=0 else "#ff6b86"
+        values=chart_window(frame,"1M").Close.tolist();low=min(values);span=max(values)-low or 1
+        points=' '.join(f'{i*100/max(1,len(values)-1):.1f},{25-(v-low)*22/span:.1f}' for i,v in enumerate(values))
+        value=f"{close:,.4f}" if name=="EUR / USD" else f"{close:,.2f}"
+        delta=f"{change:+.2f}%" if change is not None else "—"
+        cells.append(f'<div class="ticker-cell" title="{escape(market_freshness(frame),quote=True)}"><span class="ticker-name">{escape(name)}</span><div class="ticker-value">{value} <small style="color:{tone}">{delta}</small></div><div class="ticker-bottom"><span>{escape(unit)}</span><svg viewBox="0 0 100 28" aria-hidden="true"><polyline points="{points}" fill="none" stroke="{tone}" stroke-width="1.6"/></svg></div></div>')
+    st.markdown('<div class="ticker-strip">'+''.join(cells)+'</div>',unsafe_allow_html=True)
+    st.caption("MARKET PULSE · delayed daily closes · 1M traces · metals/oil futures · EUR estimates use historical FX · open Markets / Commodities for full charts")
+
+
 def world_monitor(items):
     st.subheader("WORLD MONITOR")
     controls,selector,settings=st.columns([2,2,1])
     layer=controls.radio("MAP LAYER",["All","Conflicts","Elections"],horizontal=True,key="world_layer",label_visibility="collapsed")
+    map_view=st.radio("DISPLAY",["Globe","Flat map"],horizontal=True,key="monitor_display")
     catalog=country_catalog()
     ordered=sorted(catalog,key=lambda code:catalog[code]["name"])
     with selector:
@@ -1386,17 +1467,23 @@ def world_monitor(items):
             features.append(f)
         boundaries={"type":"FeatureCollection","features":features}
         folium.GeoJson(boundaries,name="Countries",style_function=lambda f:{"fillColor":f["properties"]["fill"],"color":"#426275","weight":.6,"fillOpacity":.32 if f["properties"]["highlight"] else .10},highlight_function=lambda f:{"weight":2,"color":"#8cffff","fillOpacity":.7},tooltip=folium.GeoJsonTooltip(fields=["Country","Articles","Calendar elections","Next national vote"],aliases=["Country","Retrieved articles","Upcoming calendar entries","Next national vote"],sticky=False),embed=True).add_to(m)
-        result=st_folium(m,height=330,use_container_width=True,key="world_map_"+layer+"_"+region,returned_objects=["last_clicked"])
-        click=result.get("last_clicked") if result else None
-        fingerprint=(layer,click.get("lat"),click.get("lng")) if click else None
-        if click and fingerprint != st.session_state.get("monitor_last_click"):
-            st.session_state.monitor_last_click=fingerprint
-            point=Point(((click["lng"]+180)%360)-180,click["lat"])
-            for f in features:
-                code=f["properties"]["code"]
-                if code in catalog and shape(f["geometry"]).covers(point):
-                    open_country(code)
-                    break
+        if map_view=="Globe":
+            result=globe_component()(features=features,region=region,center=center,key="overview_globe",default=None)
+            if result and result.get("nonce")!=st.session_state.get("globe_last_nonce"):
+                st.session_state.globe_last_nonce=result.get("nonce")
+                if result.get("code") in catalog:open_country(result["code"])
+        else:
+            result=st_folium(m,height=330,use_container_width=True,key="world_map_"+layer+"_"+region,returned_objects=["last_clicked"])
+            click=result.get("last_clicked") if result else None
+            fingerprint=(layer,click.get("lat"),click.get("lng")) if click else None
+            if click and fingerprint != st.session_state.get("monitor_last_click"):
+                st.session_state.monitor_last_click=fingerprint
+                point=Point(((click["lng"]+180)%360)-180,click["lat"])
+                for f in features:
+                    code=f["properties"]["code"]
+                    if code in catalog and shape(f["geometry"]).covers(point):
+                        open_country(code)
+                        break
     else:
         st.info("Map boundaries are unavailable. Select a country above to open its briefing.")
     st.markdown('<div style="font-size:.75rem;line-height:1.7"><span style="color:#eeaa55">● Conflict reporting</span> &nbsp; <span style="color:#a995ff">● Election news / dates</span> &nbsp; <span style="color:#e785c6">● Both</span> &nbsp; <span style="color:#40e0d0">● Other coverage</span></div>',unsafe_allow_html=True)
@@ -1477,42 +1564,13 @@ def overview_panel(items, errors, change_items=None):
         return
     items=[r for r in items if r["category"]!="Sports"]
     overview_changes(items if change_items is None else change_items,items)
-    st.subheader("MARKET PULSE")
-    basket = {name: ASSETS[name] if name in ASSETS else MARKET_PRESETS[name]
-              for name in ["S&P 500", "Nasdaq", "Gold", "Silver", "Brent oil", "EUR / USD"]}
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        frames = list(pool.map(lambda name: market_data(basket[name][0]), basket))
-    with st.container(key="overview_pulse"):
-        for col, (name, (symbol, unit)), frame in zip(st.columns(6), basket.items(), frames):
-            with col, st.container(border=True):
-                if frame is None or frame.empty:
-                    st.markdown(f'<div class="pulse-header"><div class="pulse-name">{escape(name)}</div><div class="pulse-price">—</div><div class="pulse-delta" style="color:#91a8ba">Unavailable</div><div class="pulse-detail">No quote returned</div></div>',unsafe_allow_html=True)
-                    empty=go.Figure()
-                    empty.update_layout(height=50,margin=dict(l=0,r=0,t=0,b=0),paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",xaxis=dict(visible=False),yaxis=dict(visible=False))
-                    st.plotly_chart(empty,use_container_width=True,config={"displayModeBar":False},key="pulse_"+symbol)
-                    st.caption("Date unavailable")
-                    st.button("↗",key="pulse_open_"+symbol,disabled=True,use_container_width=True)
-                    continue
-                close = float(frame["Close"].iloc[-1])
-                prior = float(frame["Close"].iloc[-2]) if len(frame)>1 else None
-                change = (close/prior-1)*100 if prior else None
-                value = f"{close:,.4f}" if name == "EUR / USD" else f"{close:,.2f}"
-                delta = f"{change:+.2f}%" if change is not None else "—"
-                tone = "#40e0d0" if change is not None and change>=0 else "#ff6b86" if change is not None else "#91a8ba"
-                st.markdown(f'<div class="pulse-header"><div class="pulse-name">{escape(name)}</div><div class="pulse-price">{value}</div><div class="pulse-delta" style="color:{tone}">{delta}</div><div class="pulse-detail">{escape(unit)}</div></div>',unsafe_allow_html=True)
-                view = chart_window(frame, "1M")
-                if not view.empty:
-                    color = "#40e0d0" if float(view["Close"].iloc[-1]) >= float(view["Close"].iloc[0]) else "#ff6b86"
-                    fig=go.Figure(go.Scatter(x=view["Date"],y=view["Close"],mode="lines",line=dict(color=color,width=1.5),fill="tozeroy",fillcolor="rgba(64,224,208,.04)",hovertemplate="%{x|%d %b}<br>%{y:,.2f} "+unit+"<extra></extra>"))
-                    low,high=float(view["Close"].min()),float(view["Close"].max())
-                    pad=max((high-low)*.15,abs(high)*.002,.001)
-                    fig.update_layout(height=50,margin=dict(l=0,r=0,t=0,b=0),paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",xaxis=dict(visible=False,fixedrange=True),yaxis=dict(visible=False,range=[low-pad,high+pad],fixedrange=True),showlegend=False)
-                    st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False},key="pulse_"+symbol)
-                st.caption(market_freshness(frame))
-                if st.button("↗",key="pulse_open_"+symbol,help="Open full chart",use_container_width=True):
-                    market_dialog(name,symbol,unit,frame)
-    st.caption("Daily quotes · Yahoo Finance · delayed · 1M sparklines · metals/oil: futures")
-    world_monitor(items)
+    compact_pulse()
+    for col,channel in zip(st.columns(6),["World","Politics","Conflicts","Elections","Economic Calendar","Markets"]):
+        col.button(channel.upper()+" ↗",key="branch_"+channel,on_click=overview_navigate,args=(channel,),use_container_width=True)
+    with st.container(key="overview_command"):
+        globe,developments=st.columns([1.8,1],gap="medium")
+        with globe:world_monitor(items)
+        with developments:overview_developments(items)
     st.subheader("LATEST INTELLIGENCE")
     channels = ["All", "World", "Politics", "Elections", "Conflicts", "Markets"]
     for tab, channel in zip(st.tabs(channels), channels):
@@ -1888,8 +1946,8 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-06")
-    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"])
+    st.caption("REVISION 2026.10.22-07")
+    section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"],key="channel")
     news_scope=st.selectbox("NEWS COVERAGE",["Major developments","All reporting"],key="news_scope",help="Keyword-based filter for policy, elections, conflicts and major economic developments. Sports keeps its own coverage. Choose All reporting for broader coverage.")
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
     age = st.selectbox("STORY WINDOW", [24, 48, 168], index=1, format_func=lambda n: f"Last {n} hours")
@@ -1900,8 +1958,7 @@ with st.sidebar:
 
 if section == "Overview":
     st.markdown('<div class="tag">GLOBAL MONITORING / PERSONAL TERMINAL</div>', unsafe_allow_html=True)
-    st.title("INTELLIGENCE HUB")
-    st.caption("WORLD • POLITICS • ELECTIONS • MARKETS • COMMODITIES")
+    st.markdown('<div class="overview-title">INTELLIGENCE HUB <span>WORLD / POLICY / CONFLICT / ECONOMY</span></div>',unsafe_allow_html=True)
 else:
     st.markdown('<div class="mini-brand">◈ INTELLIGENCE HUB</div>', unsafe_allow_html=True)
 
