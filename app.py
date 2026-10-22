@@ -32,7 +32,7 @@ CSS = """
 .st-key-overview_command{position:relative;border:1px solid #284557;border-radius:5px;padding:14px 16px 10px;background:linear-gradient(135deg,#0c1c2999,#07111c55);box-shadow:inset 0 1px 0 #5babb517,0 12px 35px #0002}
 .st-key-overview_command:before,.st-key-overview_command:after{content:"";position:absolute;width:14px;height:14px;pointer-events:none;z-index:1}.st-key-overview_command:before{top:-1px;left:-1px;border-top:2px solid #55d5d0;border-left:2px solid #55d5d0}.st-key-overview_command:after{bottom:-1px;right:-1px;border-bottom:2px solid #55d5d0;border-right:2px solid #55d5d0}
 .st-key-overview_wire{border:1px solid #223c4d;border-top:2px solid #357984;border-radius:4px;padding:12px 16px;background:#09162188;margin-top:12px}
-.ops-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#809fae;font:10px monospace;letter-spacing:1px;margin:0 0 8px}.ops-strip strong{color:#68d3ce;font-weight:400}.ops-dot{display:inline-block;width:5px;height:5px;background:#57c6bc;border-radius:50%;margin-right:6px;box-shadow:0 0 7px #40e0d055}.monitor-heading{color:#d6e9f5;text-shadow:0 0 12px #2ac4d01a}.focus-label{border-left:2px solid currentColor;padding-left:8px}.ticker-strip{box-shadow:inset 0 1px 0 #6bd0d00c}.intel-row{border-top-color:#31506488}.wire-row:hover{background:#15314366}.st-key-explore_desks button:hover{border-color:#62c5cc!important;background:#173447!important}
+.ops-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#809fae;font:10px monospace;letter-spacing:1px;margin:0 0 8px}.ops-strip strong{color:#68d3ce;font-weight:400}.ops-dot{display:inline-block;width:5px;height:5px;background:#57c6bc;border-radius:50%;margin-right:6px;box-shadow:0 0 7px #40e0d055}.world-monitor-title{margin-bottom:14px!important}.st-key-overview_command [data-stale="true"]{opacity:1!important;transition:none!important}.monitor-heading{color:#d6e9f5;text-shadow:0 0 12px #2ac4d01a}.focus-label{border-left:2px solid currentColor;padding-left:8px}.ticker-strip{box-shadow:inset 0 1px 0 #6bd0d00c}.intel-row{border-top-color:#31506488}.wire-row:hover{background:#15314366}.st-key-explore_desks button:hover{border-color:#62c5cc!important;background:#173447!important}
 @media(max-width:700px){.ops-strip{font-size:9px;letter-spacing:0;flex-wrap:wrap}.st-key-overview_command,.st-key-overview_wire{padding:10px}}
 
 .st-key-explore_desks{max-width:850px}.st-key-explore_desks [data-testid="stHorizontalBlock"]{gap:6px!important}.st-key-explore_desks [data-testid="stVerticalBlock"]{gap:3px!important}.st-key-explore_desks button{min-height:25px!important;padding:1px 8px!important;border-color:#29435488!important;background:#10233266!important}.st-key-explore_desks button p{font-size:10px!important;letter-spacing:.5px}.intel-preview{font:11px/1.5 Oxanium,sans-serif;color:#92aabb;margin:0 0 4px}.wire-sub{font:9px monospace;color:#7896a9;letter-spacing:1px;margin-left:14px}.wire-row{display:flex;gap:12px;border-top:1px solid #203645;padding:9px 0}.wire-index{font-size:11px;color:#426c82;padding-top:3px}.wire-headline{font:12px/1.5 Oxanium,sans-serif;color:#dbeaf5}.wire-meta{font:10px monospace;color:#87a1b4}.st-key-overview_wire .stButton button,.st-key-overview_wire .stLinkButton a{min-height:26px;padding:2px 8px;font-size:10px}.st-key-overview_wire [data-testid="stVerticalBlock"]{gap:5px}.desk-label{font-size:9px;color:#8398a7;letter-spacing:1px}.monitor-legend{display:flex;gap:8px 14px;flex-wrap:wrap;padding:7px 0;border-top:1px solid #2a455488;font:10px/1.5 monospace;color:#b0c3cf}.monitor-legend span{display:inline-flex;align-items:center;gap:5px}.monitor-legend i{width:8px;height:8px;border-radius:2px;border:1px solid #5f778766;display:inline-block}.watch-heading{font:10px monospace;letter-spacing:1px;color:#8ca5b5;margin:10px 0 7px}.vote-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.vote-card{padding:9px 11px;border:1px solid #554d35;border-left:2px solid #c7a15d;border-radius:3px;background:#b9903010;text-decoration:none!important;min-width:0}.vote-card:hover{background:#b9903020}.vote-country{font:11px Oxanium,monospace;color:#d9e4ec;overflow-wrap:anywhere}.vote-countdown{font:22px monospace;color:#d6b76f;margin:3px 0}.vote-countdown small{font-size:9px;color:#9c967d}.vote-date{font:10px monospace;color:#8ca5b5}.st-key-overview_command [data-testid="stSegmentedControl"] button{border-radius:4px!important;padding:5px 12px!important;min-height:30px!important}.st-key-overview_command [data-testid="stSegmentedControl"] button[aria-pressed="true"]{background:#1a414b!important;border-color:#4cbbb8!important;color:#a8fff5!important}
@@ -188,6 +188,10 @@ h3{font-size:1rem!important;}
 .brief-notes{font-family:Arial,sans-serif;font-size:10.5px;line-height:1.5;font-weight:400;color:#8296a8;border-top:1px solid #263848;margin-top:6px;padding-top:7px;}
 .brief-note-label{font-size:9px;letter-spacing:1px;font-weight:500;color:#92a8bb;}
 @media(max-width:767px){.brief-note,.brief-notes{font-size:11px;}.brief-note-label{font-size:9.5px;}}
+
+
+.watch-kicker{font:10px monospace;color:#c7a15d;letter-spacing:2px;margin:8px 0}.conflict-kicker{color:#d18a94}.watch-title{font:600 23px/1.4 Oxanium,monospace!important;letter-spacing:2px;margin:0 0 12px!important}.watch-section{font:11px/1.5 monospace;letter-spacing:1px;color:#a2bfce;border-bottom:1px solid #315263;padding:8px 0;margin-bottom:9px}.contest-top{display:flex;justify-content:space-between;gap:8px;font:13px Oxanium,monospace;color:#e2ecf4}.contest-top b{font:10px monospace;color:#c7a15d;white-space:nowrap}.contest-name{font:11px/1.5 Oxanium,sans-serif;color:#9fb6c7;margin:5px 0}.contest-date{font:10px/1.5 monospace;color:#8aa4b6;margin-top:5px}.selected-dossier{border:1px solid #665b3a;border-left:3px solid #c7a15d;background:#a7832510;padding:12px 14px;margin-bottom:10px;border-radius:4px}.selected-dossier h3{font-size:18px!important;margin:4px 0 8px!important}.conflict-dossier{border-color:#68414c;border-left-color:#c57182;background:#a8496010}.zone-name{font:12px Oxanium,monospace;letter-spacing:1px;color:#d9b0b9}.zone-latest{font:11px/1.5 Oxanium,sans-serif;color:#a9bfce;margin-top:5px}.watch-article{border-top:1px solid #365366;padding-top:12px;margin-top:12px}.watch-article-title{font:600 17px/1.5 Oxanium,sans-serif;color:#e2edf6;margin-top:6px}.watch-summary{font:13px/1.7 Oxanium,sans-serif;color:#b6cbd9;margin:10px 0 14px}.st-key-election_watchboard [data-testid="stVerticalBlock"],.st-key-conflict_watchboard [data-testid="stVerticalBlock"]{gap:.55rem}.st-key-election_watchboard button,.st-key-conflict_watchboard button{min-height:29px;font-size:11px}.st-key-election_watchboard [data-testid="stVerticalBlockBorderWrapper"],.st-key-conflict_watchboard [data-testid="stVerticalBlockBorderWrapper"]{border-color:#294657!important}.st-key-election_watchboard [data-stale="true"],.st-key-conflict_watchboard [data-stale="true"]{opacity:1!important}
+@media(max-width:700px){.st-key-election_watchboard [data-testid="stHorizontalBlock"],.st-key-conflict_watchboard [data-testid="stHorizontalBlock"]{flex-wrap:wrap}.st-key-election_watchboard [data-testid="stColumn"],.st-key-conflict_watchboard [data-testid="stColumn"]{min-width:100%!important}.watch-title{font-size:19px!important}.contest-top{flex-wrap:wrap}}
 
 </style>
 """
@@ -1136,6 +1140,243 @@ def elections_calendar():
         return [], "Election calendar feed is unavailable. Election reporting below remains available."
 
 
+
+def watch_select(key,value):
+    st.session_state[key]=value
+
+
+def election_contest_type(title):
+    if re.search(r"presiden",title,re.I):return "Presidential"
+    if re.search(r"senate",title,re.I):return "National Senate"
+    if re.search(r"house of representatives",title,re.I):return "National House of Representatives"
+    if re.search(r"parliament|legislat|congress|senate|representative|national assembly|general election",title,re.I):return "Parliamentary / congressional"
+    return "National election"
+
+
+def election_watch_rows(rows,today=None):
+    today=today or datetime.now(LOCAL).date()
+    merged={}
+    for row in rows:
+        try:day=datetime.fromisoformat(row['Date']).date()
+        except (ValueError,TypeError,KeyError):continue
+        if not is_national_election(row.get('Election',''),row.get('Country',''),jurisdiction=row.get('Country','')):continue
+        title=row['Election'];kind=election_contest_type(title)
+        round_match=re.search(r"(?:second|2nd|first|1st|run[ -]?off|round\s*[12])",title,re.I)
+        round_label=('round2' if re.search(r'second|2nd|run[ -]?off|2',round_match.group(0),re.I) else 'round1') if round_match else ''
+        key=(row['Country'].casefold(),day.isoformat(),kind,round_label)
+        if key not in merged:
+            days=(day-today).days
+            merged[key]=dict(row,Kind=kind,Days=days,Status='Scheduled today' if days==0 else 'Upcoming' if days>0 else 'Date passed · verify status',References=[],Round=round_label)
+        record=merged[key]
+        if row.get('Source') and row['Source'] not in record['References']:record['References'].append(row['Source'])
+    result=sorted(merged.values(),key=lambda r:(r['Date'],r['Country'],r['Kind']))
+    for row in result:row['Key']=hashlib.sha256((row['Country']+'|'+row['Date']+'|'+row['Kind']+'|'+row['Round']).encode()).hexdigest()[:16]
+    return result
+
+
+def watch_reader(rows,scope,title):
+    st.markdown('<div class="watch-section">'+escape(title)+'</div>',unsafe_allow_html=True)
+    groups=group_reporting(rows)
+    if not groups:
+        st.info('No matching retrieved articles in this story window. Try All reporting or a wider story window.')
+        return
+    leads=[g[0] for g in groups]
+    selected=st.session_state.get(scope+'_article')
+    if selected not in {r['url'] for r in leads[:6]}:selected=leads[0]['url']
+    st.session_state[scope+'_article']=selected
+    for index,row in enumerate(leads[:6]):
+        selected_here=row['url']==selected
+        st.button(('▸ ' if selected_here else '')+row['title'],key=scope+'_pick_'+str(index),type='primary' if selected_here else 'secondary',on_click=watch_select,args=(scope+'_article',row['url']),use_container_width=True)
+    group=next(g for g in groups if g[0]['url']==selected)
+    item=group[0]
+    st.markdown('<article class="watch-article"><div class="tag">SELECTED REPORT</div><div class="watch-article-title">'+escape(item['title'])+'</div></article>',unsafe_allow_html=True)
+    st.caption(item['source']+' · '+timestamp(item.get('published')))
+    st.caption(report_context(item))
+    summary=short_preview(item.get('summary',''),110)
+    if summary:st.markdown('<div class="watch-summary">'+escape(summary)+'</div>',unsafe_allow_html=True)
+    else:st.caption('The feed did not supply an article summary.')
+    preview_key=scope+'_preview_'+hashlib.sha256(selected.encode()).hexdigest()[:12]
+    if st.button('LOAD LONGER SOURCE PREVIEW',key=scope+'_load_preview',use_container_width=True):
+        with st.spinner('Loading source preview…'):st.session_state[preview_key]=article_preview(selected) or ''
+    if preview_key in st.session_state:
+        if st.session_state[preview_key]:st.write(st.session_state[preview_key])
+        else:st.caption('A longer preview is unavailable. Open the original source to read the report.')
+    st.link_button('READ ORIGINAL SOURCE ↗',selected,use_container_width=True)
+    if len(group)>1:
+        with st.expander('RELATED SOURCE REPORTS · '+str(len(group))):
+            for row in group[1:]:st.link_button(row['source']+' · '+row['title'],row['url'],use_container_width=True)
+    if len(leads)>6:st.caption('Showing six grouped headlines; adjust filters to narrow the briefing.')
+
+
+def election_watchboard(items):
+    with st.container(key='election_watchboard'):
+        st.markdown('<div class="watch-kicker">POLITICAL INTELLIGENCE / NATIONAL VOTES</div><h2 class="watch-title">ELECTION WATCHBOARD</h2>',unsafe_allow_html=True)
+        st.caption('Select a national contest to read its reporting on the right. Calendar dates do not establish voting or result status.')
+        rows,error=elections_calendar()
+        records=election_watch_rows(rows)
+        controls,coverage=st.columns([3,1])
+        horizon=controls.segmented_control('Calendar view',['Upcoming','Scheduled today','Recent dates','All dates'],default='Upcoming',key='election_board_period') or 'Upcoming'
+        with coverage.popover('SOURCES / SCOPE',use_container_width=True):
+            st.caption('Wikidata community-maintained calendar · previous 7 days / next 180 days · six-hour cache. Major national presidential and parliamentary/congressional contests only. Dates must be checked against election authorities.')
+            st.caption('No official polling or results dataset is connected. Date-passed entries are not labelled as completed or awaiting results.')
+            if error:st.caption(error)
+        shown=[r for r in records if horizon=='All dates' or horizon=='Upcoming' and r['Days']>=0 or horizon=='Scheduled today' and r['Days']==0 or horizon=='Recent dates' and r['Days']<0]
+        country_names=sorted({r['Country'] for r in shown})
+        country_filter=st.selectbox('Country',['All countries']+country_names,key='election_board_country')
+        if country_filter!='All countries':shown=[r for r in shown if r['Country']==country_filter]
+        if error:st.caption(error)
+        left,right=st.columns([1.1,1.4],gap='large')
+        selected=st.session_state.get('selected_national_contest')
+        if selected not in {r['Key'] for r in shown}:selected=shown[0]['Key'] if shown else None
+        st.session_state.selected_national_contest=selected
+        contest=next((r for r in shown if r['Key']==selected),None)
+        with left:
+            st.markdown('<div class="watch-section">NATIONAL CONTESTS</div>',unsafe_allow_html=True)
+            if not shown:st.info('No national contests returned for this view. Reporting remains available on the right.')
+            for row in shown[:24]:
+                active=row['Key']==selected
+                with st.container(border=True):
+                    label='TODAY · SCHEDULED' if row['Days']==0 else str(row['Days'])+' DAYS TO DATE' if row['Days']>0 else str(abs(row['Days']))+' DAYS SINCE DATE'
+                    st.markdown('<div class="contest-top"><span>'+escape(row['Country'])+'</span><b>'+label+'</b></div><div class="contest-name">'+escape(row['Election'])+'</div><div class="contest-date">'+row['Date']+' · '+escape(row['Kind'])+'</div>',unsafe_allow_html=True)
+                    st.button('SELECTED ▸' if active else 'OPEN BRIEFING ↗',key='contest_'+row['Key'],type='primary' if active else 'secondary',on_click=watch_select,args=('selected_national_contest',row['Key']),use_container_width=True)
+            if len(shown)>24:st.caption('Showing the first 24 contests; choose a country to narrow the list.')
+        with right:
+            reports=[r for r in items if r['category']=='Elections']
+            if contest:
+                st.markdown('<div class="selected-dossier"><div class="tag">SELECTED NATIONAL CONTEST</div><h3>'+escape(contest['Country'])+'</h3><div>'+escape(contest['Election'])+'</div><div class="contest-date">'+contest['Date']+' · '+escape(contest['Status'])+'</div></div>',unsafe_allow_html=True)
+                with st.expander('CONTEST DETAILS / CALENDAR SOURCES',expanded=False):
+                    st.write('Office / scope: '+contest['Kind'])
+                    st.caption('Parliamentary/congressional contests elect national legislators. Presidential contests elect the presidency; office powers and voting systems vary by country.')
+                    for ref in contest['References']:st.link_button('CALENDAR RECORD ↗',ref,use_container_width=True)
+                    st.caption('Linked calendar records are not election-authority confirmations. Official polling/results are not connected.')
+                catalog=country_catalog();codes=country_mentions(contest['Country'],catalog)
+                matched=[r for r in reports if any(code in country_mentions(r['title']+' '+r.get('summary',''),catalog) for code in codes)]
+                if codes:
+                    extra,feed_error=country_news(codes[0],'Elections',age)
+                    matched+=filter_reports(extra)
+                    if feed_error:st.caption(feed_error)
+                st.caption('Country election reporting; a country may have several contests or rounds. Publication and source links identify each report.')
+                watch_reader(matched,'election_reader_'+contest['Key'],'COUNTRY ELECTION BRIEFING')
+            else:watch_reader(reports,'election_reader_global','GLOBAL ELECTION REPORTING')
+
+
+CONFLICT_FOCUS={
+    'Global reporting':None,
+    'Ukraine / Russia':{'UKR','RUS'},
+    'Israel / Palestine / Lebanon':{'ISR','PSE','LBN'},
+    'Sudan / South Sudan':{'SDN','SSD'},
+    'Sahel':{'MLI','NER','BFA','TCD','MRT'},
+    'Myanmar':{'MMR'},
+    'Yemen / Red Sea':{'YEM','SAU','ERI','DJI'}
+}
+CONFLICT_TOPICS={
+    'Military':r'\b(military|troops?|missiles?|drones?|airstrikes?|strikes?|attack|fighting|forces|invasion|bombing)\b',
+    'Diplomacy':r'ceasefire|peace|talks|diploma|negotiat|truce|treaty',
+    'Humanitarian':r'humanitarian|refugee|displaced|civilian|aid|famine|hospital',
+    'Sanctions':r'sanction|embargo|arms ban|asset freeze|export ban'
+}
+
+
+def conflict_watch_reports(items,topic='All',codes=None,catalog=None):
+    catalog=country_catalog() if catalog is None else catalog
+    rows=[]
+    for row in items:
+        if row.get('category')!='Conflicts':continue
+        text=row['title']+' '+row.get('summary','')
+        if not re.search(CONFLICT_WORDS+'|'+CONFLICT_TOPICS['Humanitarian']+'|'+CONFLICT_TOPICS['Sanctions'],text,re.I):continue
+        if topic!='All' and not re.search(CONFLICT_TOPICS[topic],text,re.I):continue
+        if codes is not None and not codes.intersection(country_mentions(text,catalog)):continue
+        rows.append(row)
+    return rows
+
+
+def reset_conflict_map():
+    st.session_state.conflict_selected_country=None
+    st.session_state.pop('conflict_watch_last_click',None)
+    st.session_state.conflict_map_revision=st.session_state.get('conflict_map_revision',0)+1
+
+
+def conflict_monitor_map(rows,selected,catalog):
+    data=world_geometry()
+    if not data:
+        st.caption('Map boundaries unavailable; use the country selectors below.')
+        return
+    matched=set(code for row in rows for code in country_mentions(row['title']+' '+row.get('summary',''),catalog))
+    selected_feature=next((f for f in data['features'] if f.get('id')==selected),None)
+    center=[22,15];zoom=1
+    if selected_feature:
+        centroid=shape(selected_feature['geometry']).representative_point();center=[centroid.y,centroid.x];zoom=3
+    m=folium.Map(location=center,zoom_start=zoom,tiles=None,control_scale=True,prefer_canvas=True,scrollWheelZoom=True)
+    m.get_root().header.add_child(folium.Element('<style>.leaflet-container{background:#091621!important}.leaflet-tooltip{background:#102230;color:#d7e8f3;border:1px solid #506d78;font:11px monospace}</style>'))
+    for lat in range(-60,90,30):folium.PolyLine([[lat,-180],[lat,180]],color='#234052',weight=.5,interactive=False).add_to(m)
+    features=[]
+    for original in data['features']:
+        f=dict(original);props=dict(f['properties']);code=f.get('id','')
+        props.update(code=code,Country=catalog.get(code,{}).get('name',props.get('name','Unknown')),Coverage='Matched retrieved reporting' if code in matched else 'No matched reporting',Selected=code==selected)
+        f['properties']=props;features.append(f)
+    folium.GeoJson({'type':'FeatureCollection','features':features},style_function=lambda f:{'fillColor':'#40d4cb' if f['properties']['Selected'] else '#a86470' if f['properties']['Coverage']=='Matched retrieved reporting' else '#102537','fillOpacity':.55 if f['properties']['Selected'] else .28,'color':'#86b6c1' if f['properties']['Selected'] else '#365366','weight':1.7 if f['properties']['Selected'] else .5},highlight_function=lambda f:{'color':'#b3f4e9','weight':2},tooltip=folium.GeoJsonTooltip(fields=['Country','Coverage'],sticky=False)).add_to(m)
+    result=st_folium(m,height=260,use_container_width=True,key='conflict_watch_map_'+str(st.session_state.get('conflict_map_revision',0)),returned_objects=['last_clicked'])
+    click=result.get('last_clicked') if result else None
+    fingerprint=(click.get('lat'),click.get('lng')) if click else None
+    if click and fingerprint!=st.session_state.get('conflict_watch_last_click'):
+        st.session_state.conflict_watch_last_click=fingerprint
+        point=Point(((click['lng']+180)%360)-180,click['lat'])
+        for f in features:
+            code=f['properties']['code']
+            if code in matched and shape(f['geometry']).covers(point):
+                st.session_state.conflict_selected_country=code
+                st.rerun()
+        if selected:
+            st.session_state.conflict_selected_country=None
+            st.rerun()
+    st.markdown('<div class="monitor-legend"><span><i style="background:#a86470"></i>Retrieved reporting</span><span><i style="background:#40d4cb"></i>Selected country</span></div>',unsafe_allow_html=True)
+    st.caption('Country-level mentions, not confirmed incident locations, front lines or threat levels. Borders are illustrative.')
+
+
+def conflict_watchboard(items):
+    with st.container(key='conflict_watchboard'):
+        st.markdown('<div class="watch-kicker conflict-kicker">SECURITY INTELLIGENCE / SOURCE MONITOR</div><h2 class="watch-title">CONFLICT ZONES</h2>',unsafe_allow_html=True)
+        controls,region=st.columns([3,2])
+        topic=controls.segmented_control('Reporting focus',['All']+list(CONFLICT_TOPICS),default='All',key='conflict_watch_topic') or 'All'
+        focus=region.selectbox('Reporting area',list(CONFLICT_FOCUS),key='conflict_watch_area')
+        catalog=country_catalog()
+        base=conflict_watch_reports(items,codes=CONFLICT_FOCUS[focus],catalog=catalog)
+        rows=conflict_watch_reports(base,topic,catalog=catalog)
+        codes=sorted(set(code for row in base for code in country_mentions(row['title']+' '+row.get('summary',''),catalog)),key=lambda code:catalog[code]['name'])
+        selected=st.session_state.get('conflict_selected_country')
+        # A country selection remains meaningful even when its current topic has no reports.
+        if selected not in codes:selected=None
+        st.session_state.conflict_selected_country=selected
+        left,right=st.columns([1.15,1.4],gap='large')
+        with left:
+            st.markdown('<div class="watch-section">REPORTING AREA / COUNTRY SELECTOR</div>',unsafe_allow_html=True)
+            conflict_monitor_map(base,selected,catalog)
+            st.button('GLOBAL / CLEAR COUNTRY' if focus=='Global reporting' else 'AREA / CLEAR COUNTRY',key='conflict_clear_country',on_click=reset_conflict_map,use_container_width=True)
+            if not codes:st.caption('No country-level matches in the retrieved reporting for this area.')
+            for code in codes[:20]:
+                country_rows=[r for r in base if code in country_mentions(r['title']+' '+r.get('summary',''),catalog)]
+                lead=sorted(country_rows,key=lambda r:r.get('published') or '',reverse=True)[0]
+                active=selected==code
+                with st.container(border=True):
+                    st.markdown('<div class="zone-name">'+escape(catalog[code]['name'].upper())+'</div><div class="zone-latest">'+escape(lead['title'])+'</div>',unsafe_allow_html=True)
+                    st.caption(lead['source']+' · '+timestamp(lead.get('published')))
+                    st.button('SELECTED ▸' if active else 'OPEN AREA BRIEFING ↗',key='conflict_country_'+code,type='primary' if active else 'secondary',on_click=watch_select,args=('conflict_selected_country',code),use_container_width=True)
+            if len(codes)>20:
+                code=st.selectbox('More reporting countries',[None]+codes,format_func=lambda c:'Choose country…' if c is None else catalog[c]['name'],key='conflict_more_country')
+                if code and st.button('SELECT COUNTRY',key='conflict_more_open'):watch_select('conflict_selected_country',code);st.rerun()
+        with right:
+            title=(catalog[selected]['name'] if selected else focus)+' · '+('All topics' if topic=='All' else topic)
+            st.markdown('<div class="selected-dossier conflict-dossier"><div class="tag">SELECTED REPORTING FOCUS</div><h3>'+escape(title)+'</h3></div>',unsafe_allow_html=True)
+            selected_rows=[r for r in rows if selected in country_mentions(r['title']+' '+r.get('summary',''),catalog)] if selected else rows
+            st.caption('Publisher claims remain attributed. Headlines can discuss several countries; this is a reporting digest, not a verified military situation assessment.')
+            scope='conflict_reader_'+(selected or 'area')+'_'+topic+'_'+focus
+            watch_reader(selected_rows,scope,'SITUATION BRIEFING / SOURCE REPORTS')
+        with st.expander('COVERAGE / SOURCE NOTES'):
+            st.caption('Area shortcuts are editorial reporting filters, not a complete inventory of active conflicts. Military, diplomacy, humanitarian and sanctions filters match headline/summary words and may overlap. No troop positions, front lines, casualty estimates or escalation scores are inferred from article counts.')
+            feed_health_panel()
+
+
+
 def news_desk(items, channel, scope=None):
     scope = scope or channel
     st.subheader(channel.upper() + " / NEWS DESK")
@@ -1345,12 +1586,13 @@ def globe_component(markup):
     return declare_component("intel_globe_"+hashlib.sha256(markup.encode()).hexdigest()[:10],path=str(directory))
 
 
-GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}body{position:relative}#leader{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}#globe{display:block;width:100%;height:360px;touch-action:none;cursor:grab}#globe:active{cursor:grabbing}#tip{position:absolute;top:5px;left:5px;pointer-events:auto;background:#0c1c2af5;padding:10px;border-radius:5px;border:1px solid #31566a;box-shadow:0 5px 20px #0005;width:238px;max-width:calc(100% - 10px);display:none;overflow:visible;box-sizing:border-box;font-size:10px;line-height:1.4;z-index:2}#tip strong{font-size:13px;color:#dceef9;display:block;letter-spacing:.7px}#tip .eyebrow{font-size:9px;letter-spacing:1px;margin-bottom:4px}#tip .detail{color:#9ab0c0;margin:4px 0}#tip .headline{border-top:1px solid #294354;margin-top:6px;padding-top:5px;color:#d5e4ee}#tip .bars{display:flex;height:22px;align-items:flex-end;gap:3px;margin-top:5px}#tip .bar{flex:1;min-height:2px;opacity:.75}#tip .foot{font-size:9px;color:#849eaf;margin-top:5px}#help{text-align:center;font-size:11px;color:#8299ab}.profile-actions{display:flex;gap:5px;margin-top:8px}.profile-actions button{background:#183744;color:#b8eeea;border:1px solid #426673;border-radius:3px;font:10px monospace;padding:5px;cursor:pointer}#zoom-controls{position:absolute;left:8px;top:8px;display:flex;gap:3px;z-index:3}#zoom-controls button{font:12px monospace;background:#0d2231;color:#a5e9e4;border:1px solid #34596b;border-radius:3px;min-width:26px;height:25px;cursor:pointer}#zoom-controls button:focus-visible{outline:2px solid #65d6d0}#zoom-value{font:10px monospace;color:#8caebb;padding:7px 4px}
+GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}body{position:relative}#leader{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}#globe{display:block;width:100%;height:360px;touch-action:none;cursor:grab}#globe:active{cursor:grabbing}#tip{position:absolute;top:5px;left:5px;pointer-events:auto;background:#0c1c2af5;padding:10px;border-radius:5px;border:1px solid #31566a;box-shadow:0 5px 20px #0005;width:238px;max-width:calc(100% - 10px);display:none;height:344px;overflow:visible;box-sizing:border-box;padding-bottom:40px;font-size:10px;line-height:1.4;z-index:2}#tip strong{font-size:13px;color:#dceef9;display:block;letter-spacing:.7px}#tip .eyebrow{font-size:9px;letter-spacing:1px;margin-bottom:4px}#tip .detail{color:#9ab0c0;margin:4px 0}#tip .story-summary{font-size:10px;line-height:1.35;color:#9bb2c1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}#tip .story-link{font-size:9px;color:#75cfc8}#tip .headline{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;border-top:1px solid #294354;margin-top:6px;padding-top:5px;color:#d5e4ee}#tip .bars{display:flex;height:22px;align-items:flex-end;gap:3px;margin-top:5px}#tip .bar{flex:1;min-height:2px;opacity:.75}#tip .foot{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9px;color:#849eaf;margin-top:5px}#help{text-align:center;font-size:11px;color:#8299ab}.profile-actions{position:absolute;bottom:9px;left:10px;display:flex;gap:5px;margin-top:8px}.profile-actions button{background:#183744;color:#b8eeea;border:1px solid #426673;border-radius:3px;font:10px monospace;padding:5px;cursor:pointer}#zoom-controls{position:absolute;left:8px;top:8px;display:flex;gap:3px;z-index:3}#zoom-controls button{font:12px monospace;background:#0d2231;color:#a5e9e4;border:1px solid #34596b;border-radius:3px;min-width:26px;height:25px;cursor:pointer}#zoom-controls button:focus-visible{outline:2px solid #65d6d0}#zoom-value{font:10px monospace;color:#8caebb;padding:7px 4px}
 </style></head><body><div id="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-reset" aria-label="Reset globe view">Reset</button><span id="zoom-value">1.0×</span></div><div id="tip"></div><svg id="globe" aria-label="Interactive world globe" role="img"></svg><svg id="leader" aria-hidden="true"><polyline id="callout-line" fill="none" stroke="#65d6d0" stroke-width="1"/><circle id="callout-dot" r="3" fill="#65d6d0"/></svg><script>
 let lastFrameHeight=null;const send=(type,extra={})=>{if(type==='streamlit:setFrameHeight'){if(extra.height===lastFrameHeight)return;lastFrameHeight=extra.height;}parent.postMessage({isStreamlitMessage:true,type,...extra},'*');};
 send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:360});
 const tip=document.getElementById('tip');
-function calloutLayout(width){const card=Math.min(340,Math.max(280,width*.38));return width>=640?{x:width-card-6,y:14,cx:(width-card-24)/2,card:card,mobile:false}:{x:6,y:368,cx:width/2,card:width-12,mobile:true};}
+function calloutLayout(width){const card=Math.min(340,Math.max(280,width*.38));return width>=640?{x:width-card-6,y:8,cx:(width-card-24)/2,card:card,mobile:false}:{x:6,y:368,cx:width/2,card:width-12,mobile:true};}
+function clearGlobeSelection(){const wasPinned=Boolean(pinnedCode);cancelHover();pinnedCode=null;resetIntel(true);if(wasPinned)send('streamlit:setComponentValue',{value:{action:'clear',nonce:Date.now()},dataType:'json'});}
 function resetIntel(force=false,resize=true){if(pinnedCode&&!force)return;cancelHover();activeHoverCode=null;tip.replaceChildren();tip.style.display='none';document.getElementById('leader').style.display='none';if(resize)send('streamlit:setFrameHeight',{height:360});}
 function positionIntel(e){
  const width=document.body.clientWidth,layout=calloutLayout(width);
@@ -1359,7 +1601,7 @@ function positionIntel(e){
  leader.style.display='block';const endX=layout.mobile?layout.x+20:layout.x-3,endY=layout.mobile?layout.y:layout.y+Math.min(tip.offsetHeight/2,110);
  line.setAttribute('points',layout.mobile?`${e.clientX},${e.clientY} ${endX},350 ${endX},${endY}`:`${e.clientX},${e.clientY} ${endX-16},${endY} ${endX},${endY}`);
  dot.setAttribute('cx',e.clientX);dot.setAttribute('cy',e.clientY);
- const fullHeight=pinnedCode?Math.max(360,layout.y+tip.offsetHeight+10):360;leader.style.height=fullHeight+'px';send('streamlit:setFrameHeight',{height:fullHeight});
+ const fullHeight=layout.mobile&&pinnedCode?layout.y+344+10:360;leader.style.height=fullHeight+'px';send('streamlit:setFrameHeight',{height:fullHeight});
 }
 function showIntel(e,d){
  const info=d.properties.intel||{},focus=info.focus||'All',tone=focus==='Conflicts'?'#ca6976':focus==='Elections'?'#c7a15d':'#40e0d0';tip.replaceChildren();
@@ -1371,15 +1613,10 @@ function showIntel(e,d){
   else add('div','No upcoming national vote in connected calendar','detail');
   add('div','Official polls/results not connected','foot');
  }
- if(pinnedCode&&(info.bars||[]).some(n=>n>0)){
-  add('div','Retrieved reports by publication day (UTC)','foot');const chart=add('div','','bars'),max=Math.max(...info.bars,1);
-  info.bars.forEach((v,i)=>{const bar=document.createElement('span');bar.className='bar';bar.style.height=Math.max(2,v/max*22)+'px';bar.style.background=tone;bar.title=info.barDates[i]+': '+v+' reports';chart.appendChild(bar);});
-  add('div',info.barDates[0]+' — '+info.barDates[6]+' · selected window only','foot');
- }
- (info.headlines||[]).slice(0,pinnedCode===d.properties.code?2:1).forEach(r=>{add('div',r.title.slice(0,105),'headline');add('div',r.source.slice(0,45)+' · '+r.time,'foot');});
+ (info.headlines||[]).slice(0,pinnedCode===d.properties.code?(focus==='Elections'?2:3):1).forEach((r,index)=>{add('div',r.title.slice(0,105),'headline');add('div',r.source.slice(0,45)+' · '+r.time,'foot');if(pinnedCode&&index===0&&r.summary&&r.summary.toLowerCase()!==r.title.toLowerCase())add('div',r.summary,'story-summary');if(pinnedCode&&r.url){const link=add('a','SOURCE ↗','story-link');link.href=r.url;link.target='_blank';link.rel='noopener noreferrer';}});
  if(!(info.headlines||[]).length)add('div','No matching retrieved headlines','detail');
  const actions=add('div','','profile-actions');
- function button(label,action){const b=document.createElement('button');b.textContent=label;b.onclick=()=>send('streamlit:setComponentValue',{value:{code:d.properties.code,action:action,nonce:Date.now()},dataType:'json'});actions.appendChild(b);}
+ function button(label,action){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{if(action==='clear'){clearGlobeSelection();return;}send('streamlit:setComponentValue',{value:{code:d.properties.code,action:action,nonce:Date.now()},dataType:'json'});};actions.appendChild(b);}
  if(pinnedCode===d.properties.code){button('OPEN COUNTRY ↗','open');button('UNPIN','clear');}
  else add('div','Click country to pin this dossier','foot');
  positionIntel(e);
@@ -1415,14 +1652,15 @@ svg.selectAll('.country').data(features).enter().append('path').attr('class','co
 .on('mouseenter',function(e,d){d3.select(this).attr('stroke','#d4ffff').attr('stroke-width',1.5);if(!pinnedCode)queueHover(e,d);})
 .on('mousemove',function(e,d){if(!pinnedCode&&activeHoverCode===d.properties.code)positionIntel(e);})
 .on('mouseleave',function(){d3.select(this).attr('stroke','#567889').attr('stroke-width',.45);})
-.on('click',(e,d)=>{if(e.defaultPrevented)return;cancelHover();pinnedCode=d.properties.code;showIntel(e,d);send('streamlit:setComponentValue',{value:{code:d.properties.code,action:'pin',nonce:Date.now()},dataType:'json'});});
+.on('click',(e,d)=>{e.stopPropagation();if(e.defaultPrevented)return;cancelHover();pinnedCode=d.properties.code;showIntel(e,d);send('streamlit:setComponentValue',{value:{code:d.properties.code,action:'pin',nonce:Date.now()},dataType:'json'});});
 draw=()=>{svg.selectAll('path').attr('d',path);if(pinnedCode){const f=features.find(f=>f.properties.code===pinnedCode);if(f){const center=d3.geoCentroid(f),xy=projection(center),visible=d3.geoDistance(center,[-rotation[0],-rotation[1]])<Math.PI/2;showIntel({clientX:visible?xy[0]:calloutLayout(width).cx,clientY:visible?xy[1]:180},f);if(!visible)document.getElementById('leader').style.display='none';}}};draw();if(!pinnedCode)send('streamlit:setFrameHeight',{height:360});
 function changeZoom(next){zoomLevel=Math.max(1,Math.min(3.5,next));projection.scale(r*zoomLevel);document.getElementById('zoom-value').textContent=zoomLevel.toFixed(1)+'×';resetIntel();draw();}
 document.getElementById('zoom-in').onclick=()=>changeZoom(zoomLevel+.3);document.getElementById('zoom-out').onclick=()=>changeZoom(zoomLevel-.3);
-document.getElementById('zoom-reset').onclick=()=>{rotation=[-args.center[1],-args.center[0]];projection.rotate(rotation);changeZoom(1);};
+document.getElementById('zoom-reset').onclick=()=>{clearGlobeSelection();rotation=[-args.center[1],-args.center[0]];projection.rotate(rotation);changeZoom(1);};
 document.getElementById('zoom-value').textContent=zoomLevel.toFixed(1)+'×';
-document.getElementById('globe').onwheel=e=>{if(!e.ctrlKey)return;e.preventDefault();changeZoom(zoomLevel*(e.deltaY<0?1.12:1/1.12));};
+document.getElementById('globe').onwheel=e=>{e.preventDefault();if(e.deltaY===0)return;changeZoom(zoomLevel*(e.deltaY<0?1.12:1/1.12));};
 
+root.on('click.clear',e=>{if(!e.defaultPrevented&&!e.target.closest('.country'))clearGlobeSelection();});
 root.call(d3.drag().on('start',()=>resetIntel()).on('drag',e=>{rotation=[rotation[0]+e.dx*.35,Math.max(-80,Math.min(80,rotation[1]-e.dy*.35))];projection.rotate(rotation);draw();}));
 });</script></body></html>"""
 
@@ -1432,14 +1670,32 @@ def monitor_reports(items,layer):
     return [item for item in items if not pattern or re.search(pattern,item.get("title","")+" "+item.get("summary",""),re.I)]
 
 
+def development_reports(items,layer,code=None,catalog=None):
+    rows=monitor_reports(items,layer)
+    if not code:return rows
+    catalog=country_catalog() if catalog is None else catalog
+    if code not in catalog:return []
+    return [row for row in rows if code in country_mentions(row.get("title","")+" "+row.get("summary",""),catalog)]
+
+
+def clear_monitor_country():
+    st.session_state.pop("pinned_country",None)
+
+
 def overview_developments(items):
     layer=(st.session_state.get("world_layer") or "All")
+    code=st.session_state.get("pinned_country")
+    catalog=country_catalog()
+    if code not in catalog:code=None
+    name=catalog[code]["name"] if code else None
     heading={"All":"CURRENT DEVELOPMENTS","Conflicts":"CONFLICT DEVELOPMENTS","Elections":"ELECTION DEVELOPMENTS"}[layer]
+    if name:heading=name.upper()+" · "+heading
     tone={"All":"#40e0d0","Conflicts":"#ca6976","Elections":"#c7a15d"}[layer]
     st.markdown('<div class="monitor-heading">'+heading+'</div>',unsafe_allow_html=True)
     st.markdown('<div class="focus-label" style="color:'+tone+'">● '+("All reporting topics" if layer=="All" else layer+" active")+'</div>',unsafe_allow_html=True)
-    groups=group_reporting(monitor_reports(items,layer))[:5]
-    if not groups:st.caption("No matching reports in this window.")
+    if code:st.button("CLEAR COUNTRY ×",key="clear_development_country",on_click=clear_monitor_country,help="Return to global developments; keep the selected topic")
+    groups=group_reporting(development_reports(items,layer,code,catalog))[:5]
+    if not groups:st.caption("No matching "+(name+" " if name else "")+"reports in this story window and topic. Open the country briefing for broader country reporting." if code else "No matching reports in this window.")
     for index,group in enumerate(groups):
         item=group[0]
         st.markdown('<div class="intel-row"><span class="tag">'+escape(item['category'].upper())+'</span><div>'+escape(item['title'])+'</div></div>',unsafe_allow_html=True)
@@ -1448,9 +1704,9 @@ def overview_developments(items):
         if summary and summary.casefold()!=item['title'].casefold():
             st.markdown('<div class="intel-preview">'+escape(summary)+'</div>',unsafe_allow_html=True)
         if st.button("BRIEF ↗",key="focus_brief_"+str(index)):story_dialog(item)
-    if layer=="Elections":
+    if layer=="Elections" and code:
         rows,error=elections_calendar()
-        dates=election_countdowns(rows)[:3]
+        dates=election_countdowns([row for row in rows if code in country_mentions(row["Country"],catalog)])[:2]
         st.markdown('<div class="focus-label">UPCOMING NATIONAL VOTES</div>',unsafe_allow_html=True)
         for row in dates:
             st.markdown("**"+escape(row["Country"])+"** · "+row["Date"]+" · "+str(row["Days to vote"])+" days")
@@ -1494,11 +1750,11 @@ def country_hover_details(code,items,election_rows,catalog,layer,already_matched
     days=[today-timedelta(days=i) for i in range(6,-1,-1)]
     daily=[sum(1 for row in matches if (row.get("published") or "")[:10]==day.isoformat()) for day in days]
     dates=election_countdowns(election_rows)
-    return {"focus":layer,"reports":len(matches),"headlines":[{"title":row["title"][:108]+("…" if len(row["title"])>108 else ""),"source":row["source"],"time":timestamp(row.get("published"))} for row in matches[:2]],"bars":daily,"barDates":[day.strftime("%d %b") for day in days],"election":({"name":dates[0].get("Election","National election"),"date":dates[0]["Date"],"days":dates[0]["Days to vote"]} if dates else None)}
+    return {"focus":layer,"reports":len(matches),"headlines":[{"title":row["title"][:108]+("…" if len(row["title"])>108 else ""),"source":row["source"],"time":timestamp(row.get("published")),"summary":short_preview(row.get("summary",""),18),"url":row["url"]} for group in group_reporting(matches)[:3] for row in group[:1]],"bars":daily,"barDates":[day.strftime("%d %b") for day in days],"election":({"name":dates[0].get("Election","National election"),"date":dates[0]["Date"],"days":dates[0]["Days to vote"]} if dates else None)}
 
 
 def world_monitor(items):
-    st.markdown('<div class="monitor-heading">WORLD MONITOR</div>',unsafe_allow_html=True)
+    st.markdown('<div class="monitor-heading world-monitor-title">WORLD MONITOR</div>',unsafe_allow_html=True)
     controls,selector,settings=st.columns([2,2,1])
     layer=controls.segmented_control("Monitor focus",["All","Conflicts","Elections"],default="All",selection_mode="single",key="world_layer",label_visibility="collapsed") or "All"
     catalog=country_catalog()
@@ -1601,33 +1857,7 @@ def world_monitor(items):
         st.info("Map boundaries are unavailable. Select a country above to open its briefing.")
     entries=([("#ca6976","Conflict reports"),("#c7a15d","Election reports / dates"),("#8b8296","Both topics"),("#40e0d0","Other reports"),("#102537","No matched coverage")] if layer=="All" else [("#ca6976","Conflict reports"),("#102537","No matching reports")] if layer=="Conflicts" else [("#c7a15d","Election reports / dates"),("#102537","No matched coverage")])
     st.markdown('<div class="monitor-legend">'+''.join('<span><i style="background:'+color+'"></i>'+label+'</span>' for color,label in entries)+'</div>',unsafe_allow_html=True)
-    st.caption("Reporting topics · not a risk rating",help="Countries may be mentioned without being the location of an event. Unhighlighted areas indicate no matching data in connected sources, not absence of events. Use + / − to zoom; Ctrl + wheel also zooms on desktop.")
-    with st.expander("OFFICIAL ECONOMIC WATCH",expanded=False):
-        st.caption("US economic releases and Fed / ECB meetings · load separately to keep the globe responsive")
-        if st.button("LOAD / REFRESH EVENTS",key="overview_load_economic"):
-            with st.spinner("Checking official calendars…"):
-                with ThreadPoolExecutor(max_workers=4) as pool:
-                    results=list(pool.map(economic_calendar_source,ECONOMIC_SOURCES))
-                st.session_state.overview_economic_events=[row for rows,status in results for row in rows]
-                st.session_state.overview_economic_health=[status for rows,status in results]
-        if "overview_economic_events" in st.session_state:
-            now=datetime.now(UTC);today=now.date().isoformat()
-            upcoming=[]
-            for row in st.session_state.overview_economic_events:
-                if row["Date"]<today:continue
-                when=row.get("WhenUTC")
-                if when and datetime.fromisoformat(when)<=now:continue
-                upcoming.append(row)
-            for row in sorted(upcoming,key=lambda row:(row["Date"],row.get("WhenUTC") or ""))[:3]:
-                when=row.get("WhenUTC")
-                time_label=datetime.fromisoformat(when).astimezone(ZoneInfo("Europe/Malta")).strftime("%H:%M Malta") if when else row.get("TimeNote","Time not published")
-                st.markdown("**"+row["Date"]+" · "+time_label+"**")
-                st.link_button(row["Event"]+" ↗",row["Source"],use_container_width=True)
-                st.caption(row["Publisher"]+" · "+row["Region"])
-            if not upcoming:st.caption("No upcoming supported events returned.")
-            statuses=st.session_state.get("overview_economic_health",[])
-            if any(status.get("Status")!="Available" for status in statuses):st.caption("Some official calendars are unavailable; coverage is incomplete.")
-            st.caption("Official calendar dates · six-hour source cache · no forecasts or actual release values connected")
+    st.caption("Reporting topics · not a risk rating",help="Countries may be mentioned without being the location of an event. Unhighlighted areas indicate no matching data in connected sources, not absence of events. Use + / − to zoom; Scroll over the globe to zoom; scrolling elsewhere moves the page.")
     with coverage_slot:
         with st.expander("Coverage / election dates",expanded=False):
             st.caption("Highlights use country mentions in retrieved reporting, not verified war-zone boundaries or risk ratings. No highlight does not establish absence of events.")
@@ -1715,7 +1945,7 @@ def overview_panel(items, errors, change_items=None):
         st.markdown('<div class="monitor-heading">INTELLIGENCE WIRE <span class="wire-sub">EXPAND YOUR COVERAGE</span></div>',unsafe_allow_html=True)
         channel=st.radio("WIRE DESK",["All","World","Politics","Elections","Conflicts","Markets"],horizontal=True,label_visibility="collapsed",key="overview_wire_channel")
         selected=items if channel=="All" else [row for row in items if row["category"]==channel]
-        lead_keys={report_key(row) for group in group_reporting(monitor_reports(items,(st.session_state.get("world_layer") or "All")))[:5] for row in group}
+        lead_keys={report_key(row) for group in group_reporting(development_reports(items,(st.session_state.get("world_layer") or "All"),st.session_state.get("pinned_country")))[:5] for row in group}
         groups=[group for group in group_reporting(selected) if not any(report_key(row) in lead_keys for row in group)][:8]
         if not groups:st.caption("No additional reporting in this desk and story window.")
         for index,group in enumerate(groups):
@@ -2081,7 +2311,7 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-14")
+    st.caption("REVISION 2026.10.22-16")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"],key="channel")
     news_scope=st.selectbox("NEWS COVERAGE",["Major developments","All reporting"],key="news_scope",help="Keyword-based filter for policy, elections, conflicts and major economic developments. Sports keeps its own coverage. Choose All reporting for broader coverage.")
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
@@ -2146,22 +2376,9 @@ def dashboard():
     elif section == "US Elections":
         us_elections_panel()
     elif section == "Elections":
-        st.subheader("WORLD ELECTION WATCH")
-        st.caption("Major national presidential and parliamentary/congressional elections only · previous 7 days / next 180 days. Regional, local, by-elections and primaries excluded. Unclear scope is omitted; verify dates at source.")
-        rows, error = elections_calendar()
-        if error:
-            st.warning(error)
-        elif rows:
-            display_rows=[]
-            for row in rows:
-                days=(datetime.fromisoformat(row["Date"]).date()-datetime.now(UTC).date()).days
-                display_rows.append(dict(row,**{"Days to vote":days if days>=0 else "Held"}))
-            st.dataframe(pd.DataFrame(display_rows), hide_index=True, use_container_width=True, column_config={"Source": st.column_config.LinkColumn("Calendar source")})
-        else:
-            st.info("No dated elections returned by the calendar source.")
-        st.caption("Poll charts appear only when verified original-source data is connected. No worldwide polling feed is currently connected.")
-        st.subheader("ELECTION REPORTING")
-        stories([a for a in items if a["category"] == "Elections"], "elections", 12)
+        election_watchboard(items)
+    elif section == "Conflicts":
+        conflict_watchboard(items)
     elif section == "Sources":
         st.subheader("SOURCE STATUS")
         for category, feeds in FEEDS.items():
@@ -2176,7 +2393,7 @@ def dashboard():
         st.caption("Google News election links may open its publisher redirect. Conflict channels include regional reporting and do not independently confirm military events. Undated articles are excluded from time-filtered feeds.")
     elif section == "Overview":
         overview_panel(items, errors, change_items=all_items)
-    elif section in ["World", "Politics", "Conflicts"]:
+    elif section in ["World", "Politics"]:
         news_desk(items, section)
     else:
         st.subheader(section.upper() + " / DISPATCHES")
