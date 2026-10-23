@@ -38,7 +38,7 @@ CSS = """
 .st-key-explore_desks{max-width:850px}.st-key-explore_desks [data-testid="stHorizontalBlock"]{gap:6px!important}.st-key-explore_desks [data-testid="stVerticalBlock"]{gap:3px!important}.st-key-explore_desks button{min-height:25px!important;padding:1px 8px!important;border-color:#29435488!important;background:#10233266!important}.st-key-explore_desks button p{font-size:10px!important;letter-spacing:.5px}.intel-preview{font:11px/1.5 Oxanium,sans-serif;color:#92aabb;margin:0 0 4px}.wire-sub{font:9px monospace;color:#7896a9;letter-spacing:1px;margin-left:14px}.wire-row{display:flex;gap:12px;border-top:1px solid #203645;padding:9px 0}.wire-index{font-size:11px;color:#426c82;padding-top:3px}.wire-headline{font:12px/1.5 Oxanium,sans-serif;color:#dbeaf5}.wire-meta{font:10px monospace;color:#87a1b4}.st-key-overview_wire .stButton button,.st-key-overview_wire .stLinkButton a{min-height:26px;padding:2px 8px;font-size:10px}.st-key-overview_wire [data-testid="stVerticalBlock"]{gap:5px}.desk-label{font-size:9px;color:#8398a7;letter-spacing:1px}.monitor-legend{display:flex;gap:8px 14px;flex-wrap:wrap;padding:7px 0;border-top:1px solid #2a455488;font:10px/1.5 monospace;color:#b0c3cf}.monitor-legend span{display:inline-flex;align-items:center;gap:5px}.monitor-legend i{width:8px;height:8px;border-radius:2px;border:1px solid #5f778766;display:inline-block}.watch-heading{font:10px monospace;letter-spacing:1px;color:#8ca5b5;margin:10px 0 7px}.vote-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.vote-card{padding:9px 11px;border:1px solid #554d35;border-left:2px solid #c7a15d;border-radius:3px;background:#b9903010;text-decoration:none!important;min-width:0}.vote-card:hover{background:#b9903020}.vote-country{font:11px Oxanium,monospace;color:#d9e4ec;overflow-wrap:anywhere}.vote-countdown{font:22px monospace;color:#d6b76f;margin:3px 0}.vote-countdown small{font-size:9px;color:#9c967d}.vote-date{font:10px monospace;color:#8ca5b5}.st-key-overview_command [data-testid="stSegmentedControl"] button{border-radius:4px!important;padding:5px 12px!important;min-height:30px!important}.st-key-overview_command [data-testid="stSegmentedControl"] button[aria-pressed="true"]{background:#1a414b!important;border-color:#4cbbb8!important;color:#a8fff5!important}
 .overview-title{font:600 1.6rem Oxanium,monospace;letter-spacing:2px;margin:4px 0 16px}.overview-title span{font:11px monospace;color:#91a8ba;letter-spacing:1px;margin-left:20px}
 .ticker-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid #294354;border-radius:6px;background:#0b1823;margin-top:8px}.ticker-cell{padding:9px 12px;border-right:1px solid #294354;min-width:0}.ticker-cell:last-child{border:0}.ticker-name{font:11px Oxanium,monospace;color:#a8bfd1}.ticker-value{font-size:16px;white-space:nowrap}.ticker-value small{font-size:11px}.ticker-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#8ca5b7}.ticker-bottom svg{width:65px;height:24px;flex-shrink:0}.intel-row{padding:6px 0 0;border-top:1px solid #213b4b;font-size:13px;line-height:1.45}.intel-row .tag{font-size:10px}.monitor-heading{font:600 15px Oxanium,monospace;letter-spacing:1px;margin:8px 0}.focus-label{font:11px monospace;margin:8px 0 12px}.st-key-overview_command [data-testid="stCaptionContainer"]{font-size:11px}.st-key-overview_command .stButton button{min-height:26px;padding:2px 10px;font-size:11px}.st-key-overview_command [data-testid="stVerticalBlock"]{gap:.5rem}
-@media(max-width:700px){.st-key-explore_desks [data-testid="stHorizontalBlock"]{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}.st-key-explore_desks [data-testid="stColumn"]{min-width:0!important;width:auto!important}.ticker-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.ticker-cell{padding:8px}.ticker-value{font-size:13px}.ticker-value small{font-size:10px}.ticker-bottom svg{width:35px}.overview-title span{display:block;margin:8px 0 0}.st-key-overview_command [data-testid="stHorizontalBlock"]{flex-wrap:wrap}.st-key-overview_command [data-testid="stColumn"]{min-width:100%!important}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child{order:2}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child{order:1}}
+@media(max-width:700px){.st-key-explore_desks [data-testid="stHorizontalBlock"]{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}.st-key-explore_desks [data-testid="stColumn"]{min-width:0!important;width:auto!important}.ticker-strip{grid-template-columns:repeat(3,minmax(0,1fr))}.ticker-cell{padding:8px}.ticker-value{font-size:13px}.ticker-value small{font-size:10px}.ticker-bottom svg{width:35px}.overview-title span{display:block;margin:8px 0 0}.st-key-overview_command [data-testid="stHorizontalBlock"]{flex-wrap:wrap}.st-key-overview_command [data-testid="stColumn"]{min-width:100%!important}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child{order:0}.st-key-overview_command > div > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child{order:1}}
 
 html, body, [class*="css"], [data-testid="stApp"] {font-family:'Share Tech Mono',monospace;}
 h1,h2,h3,[data-testid="stMetricLabel"],button,p label {font-family:'Oxanium',monospace!important;}
@@ -192,6 +192,27 @@ h3{font-size:1rem!important;}
 
 .watch-kicker{font:10px monospace;color:#c7a15d;letter-spacing:2px;margin:8px 0}.conflict-kicker{color:#d18a94}.watch-title{font:600 23px/1.4 Oxanium,monospace!important;letter-spacing:2px;margin:0 0 12px!important}.watch-section{font:11px/1.5 monospace;letter-spacing:1px;color:#a2bfce;border-bottom:1px solid #315263;padding:8px 0;margin-bottom:9px}.contest-top{display:flex;justify-content:space-between;gap:8px;font:13px Oxanium,monospace;color:#e2ecf4}.contest-top b{font:10px monospace;color:#c7a15d;white-space:nowrap}.contest-name{font:11px/1.5 Oxanium,sans-serif;color:#9fb6c7;margin:5px 0}.contest-date{font:10px/1.5 monospace;color:#8aa4b6;margin-top:5px}.selected-dossier{border:1px solid #665b3a;border-left:3px solid #c7a15d;background:#a7832510;padding:12px 14px;margin-bottom:10px;border-radius:4px}.selected-dossier h3{font-size:18px!important;margin:4px 0 8px!important}.conflict-dossier{border-color:#68414c;border-left-color:#c57182;background:#a8496010}.zone-name{font:12px Oxanium,monospace;letter-spacing:1px;color:#d9b0b9}.zone-latest{font:11px/1.5 Oxanium,sans-serif;color:#a9bfce;margin-top:5px}.watch-article{border-top:1px solid #365366;padding-top:12px;margin-top:12px}.watch-article-title{font:600 17px/1.5 Oxanium,sans-serif;color:#e2edf6;margin-top:6px}.watch-summary{font:13px/1.7 Oxanium,sans-serif;color:#b6cbd9;margin:10px 0 14px}.st-key-election_watchboard [data-testid="stVerticalBlock"],.st-key-conflict_watchboard [data-testid="stVerticalBlock"]{gap:.55rem}.st-key-election_watchboard button,.st-key-conflict_watchboard button{min-height:29px;font-size:11px}.st-key-election_watchboard [data-testid="stVerticalBlockBorderWrapper"],.st-key-conflict_watchboard [data-testid="stVerticalBlockBorderWrapper"]{border-color:#294657!important}.st-key-election_watchboard [data-stale="true"],.st-key-conflict_watchboard [data-stale="true"]{opacity:1!important}
 @media(max-width:700px){.st-key-election_watchboard [data-testid="stHorizontalBlock"],.st-key-conflict_watchboard [data-testid="stHorizontalBlock"]{flex-wrap:wrap}.st-key-election_watchboard [data-testid="stColumn"],.st-key-conflict_watchboard [data-testid="stColumn"]{min-width:100%!important}.watch-title{font-size:19px!important}.contest-top{flex-wrap:wrap}}
+
+
+/* Final responsive layer: content stacks; compact controls keep their own grids. */
+.st-key-election_mobile_contests,.st-key-conflict_mobile_countries,[class*="_mobile_articles"]{display:none}
+@media(max-width:767px){
+ .stApp [data-testid="stMainBlockContainer"],.stApp .block-container{padding:3.6rem .65rem 1.5rem!important;max-width:100%!important}
+ [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"]{gap:.65rem!important}
+ [data-testid="stColumn"],[data-testid="stVerticalBlock"],[data-testid="stElementContainer"]{min-width:0}
+ .ops-masthead{padding:0 0 5px!important}.ops-eyebrow{font-size:8px!important;letter-spacing:1px!important;line-height:1.6!important}.overview-title{font-size:1.25rem!important;letter-spacing:1px!important;gap:4px!important;margin-bottom:4px!important}.overview-title span{font-size:9px!important;letter-spacing:.5px!important;margin:0!important}.ops-strip{font-size:9px!important;line-height:1.6!important}
+ .ticker-strip{display:flex!important;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:thin;-webkit-overflow-scrolling:touch;width:100%;max-width:100%}.ticker-cell{flex:0 0 142px;padding:8px!important;scroll-snap-align:start}.ticker-name{font-size:11px}.ticker-value{font-size:14px!important}.ticker-value small{font-size:11px}.ticker-bottom{font-size:10px}.ticker-bottom svg{width:40px!important;height:20px!important}
+ .st-key-explore_desks{max-width:100%}.st-key-explore_desks [data-testid="stHorizontalBlock"]{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px!important}.st-key-explore_desks [data-testid="stColumn"]{min-width:0!important;width:auto!important;flex:initial!important}.st-key-explore_desks button{min-height:38px!important;padding:4px!important}.st-key-explore_desks button p{font-size:10px!important;letter-spacing:0!important}
+ .st-key-overview_command{padding:9px 8px!important;box-shadow:none}.monitor-heading{font-size:14px;line-height:1.5}.world-monitor-title{margin-bottom:9px!important}
+ .st-key-monitor_controls [data-testid="stHorizontalBlock"]{display:grid!important;grid-template-columns:minmax(0,1fr) 48px;gap:7px!important}.st-key-monitor_controls [data-testid="stColumn"]{min-width:0!important;width:auto!important;flex:initial!important}.st-key-monitor_controls [data-testid="stColumn"]:first-child{grid-column:1 / -1}
+ [data-testid="stButtonGroup"]{max-width:100%;overflow-x:auto}.st-key-monitor_controls [data-testid="stButtonGroup"]>div{display:flex;flex-wrap:nowrap;width:100%}.st-key-monitor_controls [data-testid="stButtonGroup"] button{min-height:38px!important;flex:1;font-size:12px!important}
+ .monitor-legend{font-size:10px!important;gap:6px 10px;padding:7px 0}.monitor-legend span{white-space:normal}.intel-row{font:13px/1.5 Oxanium,sans-serif}.intel-preview{font-size:12px;line-height:1.6}.st-key-overview_command [data-testid="stCaptionContainer"] p{font-size:11px!important;line-height:1.5!important}.st-key-overview_command .stButton button{min-height:40px!important}
+ .st-key-overview_wire{padding:9px 8px}.wire-sub{display:none}.wire-headline{font-size:13px}.wire-meta{font-size:11px}.wire-index{font-size:10px}.st-key-overview_wire [class*="st-key-wire_row_"] [data-testid="stHorizontalBlock"]{display:grid!important;grid-template-columns:1fr 1fr;gap:5px!important}.st-key-overview_wire [class*="st-key-wire_row_"] [data-testid="stColumn"]{width:auto!important;min-width:0!important;flex:initial!important}.st-key-overview_wire [class*="st-key-wire_row_"] [data-testid="stColumn"]:first-child{grid-column:1 / -1}
+ .st-key-election_desktop_contests,.st-key-conflict_desktop_countries,[class*="_desktop_articles"]{display:none!important}.st-key-election_mobile_contests,.st-key-conflict_mobile_countries,[class*="_mobile_articles"]{display:block!important}
+ .st-key-election_watchboard [data-testid="stColumn"],.st-key-conflict_watchboard [data-testid="stColumn"]{min-width:0!important}.watch-title{font-size:19px!important;line-height:1.4!important}.watch-summary{font-size:14px;line-height:1.7}.watch-article-title{font-size:16px;line-height:1.5}.selected-dossier{padding:10px}.selected-dossier h3{font-size:16px!important}.watch-section{font-size:11px;line-height:1.5}.st-key-election_watchboard button,.st-key-conflict_watchboard button{min-height:40px!important}
+ [data-testid="stPlotlyChart"],[data-testid="stDataFrame"]{max-width:100%}.st-key-markets_compact_page [data-testid="stMetric"]{padding:7px 9px!important}.st-key-markets_compact_page [data-testid="stMetricValue"]{font-size:1.15rem!important}.st-key-commodity_controls [data-testid="stColumn"]{min-width:0!important}
+ [data-testid="stDialog"] [role="dialog"]{width:calc(100vw - 12px)!important;max-width:calc(100vw - 12px)!important}.st-key-brief_scroll{max-height:65dvh!important;padding-right:.25rem}.brief-title{font-size:16px;line-height:1.5}
+}
 
 </style>
 """
@@ -1141,6 +1162,10 @@ def elections_calendar():
 
 
 
+def watch_sync(widget_key,target_key):
+    st.session_state[target_key]=st.session_state[widget_key]
+
+
 def watch_select(key,value):
     st.session_state[key]=value
 
@@ -1184,9 +1209,14 @@ def watch_reader(rows,scope,title):
     selected=st.session_state.get(scope+'_article')
     if selected not in {r['url'] for r in leads[:6]}:selected=leads[0]['url']
     st.session_state[scope+'_article']=selected
-    for index,row in enumerate(leads[:6]):
-        selected_here=row['url']==selected
-        st.button(('▸ ' if selected_here else '')+row['title'],key=scope+'_pick_'+str(index),type='primary' if selected_here else 'secondary',on_click=watch_select,args=(scope+'_article',row['url']),use_container_width=True)
+    with st.container(key=scope+'_mobile_articles'):
+        mobile_key=scope+'_mobile_article_choice'
+        st.session_state[mobile_key]=selected
+        st.selectbox('Choose report',[r['url'] for r in leads[:6]],format_func=lambda url:next(r['title'] for r in leads if r['url']==url),key=mobile_key,on_change=watch_sync,args=(mobile_key,scope+'_article'))
+    with st.container(key=scope+'_desktop_articles'):
+        for index,row in enumerate(leads[:6]):
+            selected_here=row['url']==selected
+            st.button(('▸ ' if selected_here else '')+row['title'],key=scope+'_pick_'+str(index),type='primary' if selected_here else 'secondary',on_click=watch_select,args=(scope+'_article',row['url']),use_container_width=True)
     group=next(g for g in groups if g[0]['url']==selected)
     item=group[0]
     st.markdown('<article class="watch-article"><div class="tag">SELECTED REPORT</div><div class="watch-article-title">'+escape(item['title'])+'</div></article>',unsafe_allow_html=True)
@@ -1233,13 +1263,18 @@ def election_watchboard(items):
         with left:
             st.markdown('<div class="watch-section">NATIONAL CONTESTS</div>',unsafe_allow_html=True)
             if not shown:st.info('No national contests returned for this view. Reporting remains available on the right.')
-            for row in shown[:24]:
-                active=row['Key']==selected
-                with st.container(border=True):
-                    label='TODAY · SCHEDULED' if row['Days']==0 else str(row['Days'])+' DAYS TO DATE' if row['Days']>0 else str(abs(row['Days']))+' DAYS SINCE DATE'
-                    st.markdown('<div class="contest-top"><span>'+escape(row['Country'])+'</span><b>'+label+'</b></div><div class="contest-name">'+escape(row['Election'])+'</div><div class="contest-date">'+row['Date']+' · '+escape(row['Kind'])+'</div>',unsafe_allow_html=True)
-                    st.button('SELECTED ▸' if active else 'OPEN BRIEFING ↗',key='contest_'+row['Key'],type='primary' if active else 'secondary',on_click=watch_select,args=('selected_national_contest',row['Key']),use_container_width=True)
-            if len(shown)>24:st.caption('Showing the first 24 contests; choose a country to narrow the list.')
+            with st.container(key='election_mobile_contests'):
+                if shown:
+                    st.session_state.election_mobile_choice=selected
+                    st.selectbox('National contest',[r['Key'] for r in shown],format_func=lambda key:next(r['Country']+' · '+r['Date']+' · '+r['Kind'] for r in shown if r['Key']==key),key='election_mobile_choice',on_change=watch_sync,args=('election_mobile_choice','selected_national_contest'))
+            with st.container(key='election_desktop_contests'):
+                for row in shown[:24]:
+                    active=row['Key']==selected
+                    with st.container(border=True):
+                        label='TODAY · SCHEDULED' if row['Days']==0 else str(row['Days'])+' DAYS TO DATE' if row['Days']>0 else str(abs(row['Days']))+' DAYS SINCE DATE'
+                        st.markdown('<div class="contest-top"><span>'+escape(row['Country'])+'</span><b>'+label+'</b></div><div class="contest-name">'+escape(row['Election'])+'</div><div class="contest-date">'+row['Date']+' · '+escape(row['Kind'])+'</div>',unsafe_allow_html=True)
+                        st.button('SELECTED ▸' if active else 'OPEN BRIEFING ↗',key='contest_'+row['Key'],type='primary' if active else 'secondary',on_click=watch_select,args=('selected_national_contest',row['Key']),use_container_width=True)
+                if len(shown)>24:st.caption('Showing the first 24 contests; choose a country to narrow the list.')
         with right:
             reports=[r for r in items if r['category']=='Elections']
             if contest:
@@ -1353,17 +1388,21 @@ def conflict_watchboard(items):
             conflict_monitor_map(base,selected,catalog)
             st.button('GLOBAL / CLEAR COUNTRY' if focus=='Global reporting' else 'AREA / CLEAR COUNTRY',key='conflict_clear_country',on_click=reset_conflict_map,use_container_width=True)
             if not codes:st.caption('No country-level matches in the retrieved reporting for this area.')
-            for code in codes[:20]:
-                country_rows=[r for r in base if code in country_mentions(r['title']+' '+r.get('summary',''),catalog)]
-                lead=sorted(country_rows,key=lambda r:r.get('published') or '',reverse=True)[0]
-                active=selected==code
-                with st.container(border=True):
-                    st.markdown('<div class="zone-name">'+escape(catalog[code]['name'].upper())+'</div><div class="zone-latest">'+escape(lead['title'])+'</div>',unsafe_allow_html=True)
-                    st.caption(lead['source']+' · '+timestamp(lead.get('published')))
-                    st.button('SELECTED ▸' if active else 'OPEN AREA BRIEFING ↗',key='conflict_country_'+code,type='primary' if active else 'secondary',on_click=watch_select,args=('conflict_selected_country',code),use_container_width=True)
-            if len(codes)>20:
-                code=st.selectbox('More reporting countries',[None]+codes,format_func=lambda c:'Choose country…' if c is None else catalog[c]['name'],key='conflict_more_country')
-                if code and st.button('SELECT COUNTRY',key='conflict_more_open'):watch_select('conflict_selected_country',code);st.rerun()
+            with st.container(key='conflict_mobile_countries'):
+                st.session_state.conflict_mobile_choice=selected
+                st.selectbox('Reporting country',[None]+codes,format_func=lambda code:'All countries in area' if code is None else catalog[code]['name'],key='conflict_mobile_choice',on_change=watch_sync,args=('conflict_mobile_choice','conflict_selected_country'))
+            with st.container(key='conflict_desktop_countries'):
+                for code in codes[:20]:
+                    country_rows=[r for r in base if code in country_mentions(r['title']+' '+r.get('summary',''),catalog)]
+                    lead=sorted(country_rows,key=lambda r:r.get('published') or '',reverse=True)[0]
+                    active=selected==code
+                    with st.container(border=True):
+                        st.markdown('<div class="zone-name">'+escape(catalog[code]['name'].upper())+'</div><div class="zone-latest">'+escape(lead['title'])+'</div>',unsafe_allow_html=True)
+                        st.caption(lead['source']+' · '+timestamp(lead.get('published')))
+                        st.button('SELECTED ▸' if active else 'OPEN AREA BRIEFING ↗',key='conflict_country_'+code,type='primary' if active else 'secondary',on_click=watch_select,args=('conflict_selected_country',code),use_container_width=True)
+                if len(codes)>20:
+                    code=st.selectbox('More reporting countries',[None]+codes,format_func=lambda c:'Choose country…' if c is None else catalog[c]['name'],key='conflict_more_country')
+                    if code and st.button('SELECT COUNTRY',key='conflict_more_open'):watch_select('conflict_selected_country',code);st.rerun()
         with right:
             title=(catalog[selected]['name'] if selected else focus)+' · '+('All topics' if topic=='All' else topic)
             st.markdown('<div class="selected-dossier conflict-dossier"><div class="tag">SELECTED REPORTING FOCUS</div><h3>'+escape(title)+'</h3></div>',unsafe_allow_html=True)
@@ -1587,21 +1626,32 @@ def globe_component(markup):
 
 
 GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script><style>html{background:transparent}body{margin:0;background:transparent;color:#a6c0d2;font:12px monospace}body{position:relative}#leader{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}#globe{display:block;width:100%;height:360px;touch-action:none;cursor:grab}#globe:active{cursor:grabbing}#tip{position:absolute;top:5px;left:5px;pointer-events:auto;background:#0c1c2af5;padding:10px;border-radius:5px;border:1px solid #31566a;box-shadow:0 5px 20px #0005;width:238px;max-width:calc(100% - 10px);display:none;height:344px;overflow:visible;box-sizing:border-box;padding-bottom:40px;font-size:10px;line-height:1.4;z-index:2}#tip strong{font-size:13px;color:#dceef9;display:block;letter-spacing:.7px}#tip .eyebrow{font-size:9px;letter-spacing:1px;margin-bottom:4px}#tip .detail{color:#9ab0c0;margin:4px 0}#tip .story-summary{font-size:10px;line-height:1.35;color:#9bb2c1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}#tip .story-link{font-size:9px;color:#75cfc8}#tip .headline{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;border-top:1px solid #294354;margin-top:6px;padding-top:5px;color:#d5e4ee}#tip .bars{display:flex;height:22px;align-items:flex-end;gap:3px;margin-top:5px}#tip .bar{flex:1;min-height:2px;opacity:.75}#tip .foot{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9px;color:#849eaf;margin-top:5px}#help{text-align:center;font-size:11px;color:#8299ab}.profile-actions{position:absolute;bottom:9px;left:10px;display:flex;gap:5px;margin-top:8px}.profile-actions button{background:#183744;color:#b8eeea;border:1px solid #426673;border-radius:3px;font:10px monospace;padding:5px;cursor:pointer}#zoom-controls{position:absolute;left:8px;top:8px;display:flex;gap:3px;z-index:3}#zoom-controls button{font:12px monospace;background:#0d2231;color:#a5e9e4;border:1px solid #34596b;border-radius:3px;min-width:26px;height:25px;cursor:pointer}#zoom-controls button:focus-visible{outline:2px solid #65d6d0}#zoom-value{font:10px monospace;color:#8caebb;padding:7px 4px}
+@media(max-width:639px){
+ #globe{height:300px;touch-action:pan-y}
+ #zoom-controls{left:4px;top:4px;gap:4px}#zoom-controls button{min-width:36px;height:36px;font-size:15px}#zoom-value{padding-top:12px}
+ #tip{height:auto;min-height:0;padding:12px;font-size:12px;line-height:1.5;border-radius:6px}
+ #tip strong{font-size:16px}#tip .eyebrow{font-size:10px;margin-bottom:6px}#tip .headline{font-size:12px;line-height:1.5;-webkit-line-clamp:3;margin-top:9px;padding-top:8px}
+ #tip .detail{font-size:11px}#tip .foot{font-size:10px;white-space:normal;line-height:1.5}#tip .story-summary{font-size:12px;line-height:1.5;-webkit-line-clamp:3}#tip .story-link{display:inline-flex;align-items:center;min-height:34px;font-size:11px}
+ .profile-actions{position:static;display:flex;flex-wrap:wrap;margin-top:10px;gap:7px}.profile-actions button{min-height:40px;padding:8px 10px;font-size:11px}
+ #leader{display:none!important}
+}
 </style></head><body><div id="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-reset" aria-label="Reset globe view">Reset</button><span id="zoom-value">1.0×</span></div><div id="tip"></div><svg id="globe" aria-label="Interactive world globe" role="img"></svg><svg id="leader" aria-hidden="true"><polyline id="callout-line" fill="none" stroke="#65d6d0" stroke-width="1"/><circle id="callout-dot" r="3" fill="#65d6d0"/></svg><script>
 let lastFrameHeight=null;const send=(type,extra={})=>{if(type==='streamlit:setFrameHeight'){if(extra.height===lastFrameHeight)return;lastFrameHeight=extra.height;}parent.postMessage({isStreamlitMessage:true,type,...extra},'*');};
-send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:360});
+send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:globeHeight(document.body.clientWidth)});
 const tip=document.getElementById('tip');
-function calloutLayout(width){const card=Math.min(340,Math.max(280,width*.38));return width>=640?{x:width-card-6,y:8,cx:(width-card-24)/2,card:card,mobile:false}:{x:6,y:368,cx:width/2,card:width-12,mobile:true};}
+function globeHeight(width){return width<640?300:360;}
+function calloutLayout(width){const card=Math.min(340,Math.max(280,width*.38));return width>=640?{x:width-card-6,y:8,cx:(width-card-24)/2,card:card,mobile:false}:{x:6,y:312,cx:width/2,card:width-12,mobile:true};}
 function clearGlobeSelection(){const wasPinned=Boolean(pinnedCode);cancelHover();pinnedCode=null;resetIntel(true);if(wasPinned)send('streamlit:setComponentValue',{value:{action:'clear',nonce:Date.now()},dataType:'json'});}
-function resetIntel(force=false,resize=true){if(pinnedCode&&!force)return;cancelHover();activeHoverCode=null;tip.replaceChildren();tip.style.display='none';document.getElementById('leader').style.display='none';if(resize)send('streamlit:setFrameHeight',{height:360});}
+function resetIntel(force=false,resize=true){if(pinnedCode&&!force)return;cancelHover();activeHoverCode=null;tip.replaceChildren();tip.style.display='none';document.getElementById('leader').style.display='none';if(resize)send('streamlit:setFrameHeight',{height:globeHeight(document.body.clientWidth)});}
 function positionIntel(e){
  const width=document.body.clientWidth,layout=calloutLayout(width);
+ if(layout.mobile&&!pinnedCode){tip.style.display='none';return;}
  tip.style.display='block';tip.style.left=layout.x+'px';tip.style.top=layout.y+'px';tip.style.width=layout.card+'px';
  const leader=document.getElementById('leader'),line=document.getElementById('callout-line'),dot=document.getElementById('callout-dot');
- leader.style.display='block';const endX=layout.mobile?layout.x+20:layout.x-3,endY=layout.mobile?layout.y:layout.y+Math.min(tip.offsetHeight/2,110);
+ leader.style.display=layout.mobile?'none':'block';const endX=layout.mobile?layout.x+20:layout.x-3,endY=layout.mobile?layout.y:layout.y+Math.min(tip.offsetHeight/2,110);
  line.setAttribute('points',layout.mobile?`${e.clientX},${e.clientY} ${endX},350 ${endX},${endY}`:`${e.clientX},${e.clientY} ${endX-16},${endY} ${endX},${endY}`);
  dot.setAttribute('cx',e.clientX);dot.setAttribute('cy',e.clientY);
- const fullHeight=layout.mobile&&pinnedCode?layout.y+344+10:360;leader.style.height=fullHeight+'px';send('streamlit:setFrameHeight',{height:fullHeight});
+ const fullHeight=layout.mobile&&pinnedCode?layout.y+tip.offsetHeight+12:360;leader.style.height=fullHeight+'px';send('streamlit:setFrameHeight',{height:fullHeight});
 }
 function showIntel(e,d){
  const info=d.properties.intel||{},focus=info.focus||'All',tone=focus==='Conflicts'?'#ca6976':focus==='Elections'?'#c7a15d':'#40e0d0';tip.replaceChildren();
@@ -1624,6 +1674,7 @@ function showIntel(e,d){
 let hoverTimer=null,hideTimer=null,activeHoverCode=null,pendingHoverCode=null;
 function cancelHover(){clearTimeout(hoverTimer);clearTimeout(hideTimer);hoverTimer=null;hideTimer=null;pendingHoverCode=null;}
 function queueHover(e,d){
+ if(document.body.clientWidth<640||window.matchMedia('(pointer:coarse)').matches)return;
  clearTimeout(hideTimer);
  if(activeHoverCode===d.properties.code){clearTimeout(hoverTimer);pendingHoverCode=null;return;}
  clearTimeout(hoverTimer);pendingHoverCode=d.properties.code;
@@ -1635,10 +1686,10 @@ tip.addEventListener('mouseenter',cancelHover);tip.addEventListener('mouseleave'
 document.getElementById('globe').addEventListener('mouseenter',()=>clearTimeout(hideTimer));
 document.getElementById('globe').addEventListener('mouseleave',delayedHide);
 let pinnedCode=null;
-let args,rotation=[-15,-20],draw,lastRegion,zoomLevel=1;
+let args,rotation=[-15,-20],draw,lastRegion,zoomLevel=1,suppressClickUntil=0;
 addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;pinnedCode=args.pinned||null;resetIntel(true,false);if(args.region!==lastRegion){rotation=[-args.center[1],-args.center[0]];lastRegion=args.region;}
 if(!window.d3){document.getElementById('tip').textContent='Globe unavailable — use Flat map or country search';return;}
-const width=document.body.clientWidth,height=360,r=Math.min((calloutLayout(width).mobile?width:width-calloutLayout(width).card-24)/2-16,164),root=d3.select('#globe').attr('viewBox',`0 0 ${width} ${height}`);root.selectAll('*').remove();
+const width=document.body.clientWidth,height=globeHeight(width),r=Math.min((calloutLayout(width).mobile?width:width-calloutLayout(width).card-24)/2-16,calloutLayout(width).mobile?128:164),root=d3.select('#globe').style('height',height+'px').attr('viewBox',`0 0 ${width} ${height}`);root.selectAll('*').remove();
 const clip=root.append('defs').append('clipPath').attr('id','globe-viewport');clip.append('rect').attr('x',0).attr('y',0).attr('width',calloutLayout(width).mobile?width:calloutLayout(width).x-12).attr('height',height);const svg=root.append('g').attr('clip-path','url(#globe-viewport)');
 const projection=d3.geoOrthographic().translate([calloutLayout(width).cx,height/2]).scale(r*zoomLevel).rotate(rotation).clipAngle(90),path=d3.geoPath(projection);
 const defs=svg.append('defs'),grad=defs.append('radialGradient').attr('id','ocean');grad.append('stop').attr('offset','0%').attr('stop-color','#13394b');grad.append('stop').attr('offset','100%').attr('stop-color','#071420');
@@ -1648,21 +1699,40 @@ svg.append('circle').attr('cx',calloutLayout(width).cx).attr('cy',height/2).attr
 svg.append('path').datum({type:'Sphere'}).attr('fill','url(#ocean)').attr('stroke','#487587');
 svg.append('path').datum(d3.geoGraticule10()).attr('fill','none').attr('stroke','#2c5265').attr('stroke-width',.4);
 const features=args.features.map(f=>{const g=JSON.parse(JSON.stringify(f));const polys=g.geometry.type==='Polygon'?[g.geometry.coordinates]:g.geometry.type==='MultiPolygon'?g.geometry.coordinates:[];polys.forEach(rings=>{if(d3.geoArea({type:'Polygon',coordinates:rings})>2*Math.PI)rings.forEach(ring=>ring.reverse());});return g;});
-svg.selectAll('.country').data(features).enter().append('path').attr('class','country').attr('fill',d=>d.properties.fill).attr('fill-opacity',d=>d.properties.highlight?.58:.35).attr('stroke','#567889').attr('stroke-width',.45)
+function bindCountryEvents(selection){selection
 .on('mouseenter',function(e,d){d3.select(this).attr('stroke','#d4ffff').attr('stroke-width',1.5);if(!pinnedCode)queueHover(e,d);})
 .on('mousemove',function(e,d){if(!pinnedCode&&activeHoverCode===d.properties.code)positionIntel(e);})
 .on('mouseleave',function(){d3.select(this).attr('stroke','#567889').attr('stroke-width',.45);})
-.on('click',(e,d)=>{e.stopPropagation();if(e.defaultPrevented)return;cancelHover();pinnedCode=d.properties.code;showIntel(e,d);send('streamlit:setComponentValue',{value:{code:d.properties.code,action:'pin',nonce:Date.now()},dataType:'json'});});
-draw=()=>{svg.selectAll('path').attr('d',path);if(pinnedCode){const f=features.find(f=>f.properties.code===pinnedCode);if(f){const center=d3.geoCentroid(f),xy=projection(center),visible=d3.geoDistance(center,[-rotation[0],-rotation[1]])<Math.PI/2;showIntel({clientX:visible?xy[0]:calloutLayout(width).cx,clientY:visible?xy[1]:180},f);if(!visible)document.getElementById('leader').style.display='none';}}};draw();if(!pinnedCode)send('streamlit:setFrameHeight',{height:360});
-function changeZoom(next){zoomLevel=Math.max(1,Math.min(3.5,next));projection.scale(r*zoomLevel);document.getElementById('zoom-value').textContent=zoomLevel.toFixed(1)+'×';resetIntel();draw();}
-document.getElementById('zoom-in').onclick=()=>changeZoom(zoomLevel+.3);document.getElementById('zoom-out').onclick=()=>changeZoom(zoomLevel-.3);
+.on('click',(e,d)=>{e.stopPropagation();if(e.defaultPrevented||Date.now()<suppressClickUntil)return;cancelHover();pinnedCode=d.properties.code;showIntel(e,d);send('streamlit:setComponentValue',{value:{code:d.properties.code,action:'pin',nonce:Date.now()},dataType:'json'});});}
+svg.selectAll('.country').data(features).enter().append('path').attr('class','country').attr('fill',d=>d.properties.fill).attr('fill-opacity',d=>d.properties.highlight?.58:.35).attr('stroke','#567889').attr('stroke-width',.45).call(bindCountryEvents);
+const malta=features.find(f=>f.properties.code==='MLT');
+const maltaPoint=[14.3754,35.9375];
+let maltaMarker=null,maltaLabel=null;
+if(malta){
+ maltaMarker=svg.append('circle').datum(malta).attr('class','country island-target').attr('r',window.matchMedia('(pointer:coarse)').matches?11:7).attr('fill','#40e0d099').attr('stroke','#bafff3').attr('stroke-width',1.2).attr('tabindex',0).attr('role','button').attr('aria-label','Select Malta').call(bindCountryEvents);
+ maltaMarker.on('keydown',function(e){if(e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();cancelHover();pinnedCode='MLT';const xy=projection(maltaPoint);showIntel({clientX:xy[0],clientY:xy[1]},malta);send('streamlit:setComponentValue',{value:{code:'MLT',action:'pin',nonce:Date.now()},dataType:'json'});});
+ maltaLabel=svg.append('text').attr('fill','#a6f0e7').attr('font-size',9).attr('font-family','monospace').attr('pointer-events','none').text('MALTA');
+}
+draw=()=>{svg.selectAll('path').attr('d',path);if(maltaMarker){const xy=projection(maltaPoint),visible=d3.geoDistance(maltaPoint,[-rotation[0],-rotation[1]])<Math.PI/2;maltaMarker.attr('cx',xy[0]).attr('cy',xy[1]).attr('display',visible?null:'none');maltaLabel.attr('x',xy[0]+10).attr('y',xy[1]+3).attr('display',visible&&zoomLevel>=2?null:'none');}if(pinnedCode){const f=features.find(f=>f.properties.code===pinnedCode);if(f){const center=d3.geoCentroid(f),xy=projection(center),visible=d3.geoDistance(center,[-rotation[0],-rotation[1]])<Math.PI/2;showIntel({clientX:visible?xy[0]:calloutLayout(width).cx,clientY:visible?xy[1]:height/2},f);if(!visible)document.getElementById('leader').style.display='none';}}};draw();if(!pinnedCode)send('streamlit:setFrameHeight',{height:height});
+function changeZoom(next){zoomLevel=Math.max(1,Math.min(8,next));projection.scale(r*zoomLevel);document.getElementById('zoom-value').textContent=zoomLevel.toFixed(1)+'×';resetIntel();draw();}
+document.getElementById('zoom-in').onclick=()=>changeZoom(zoomLevel*1.25);document.getElementById('zoom-out').onclick=()=>changeZoom(zoomLevel/1.25);
 document.getElementById('zoom-reset').onclick=()=>{clearGlobeSelection();rotation=[-args.center[1],-args.center[0]];projection.rotate(rotation);changeZoom(1);};
 document.getElementById('zoom-value').textContent=zoomLevel.toFixed(1)+'×';
 document.getElementById('globe').onwheel=e=>{e.preventDefault();if(e.deltaY===0)return;changeZoom(zoomLevel*(e.deltaY<0?1.12:1/1.12));};
 
-root.on('click.clear',e=>{if(!e.defaultPrevented&&!e.target.closest('.country'))clearGlobeSelection();});
-root.call(d3.drag().on('start',()=>resetIntel()).on('drag',e=>{rotation=[rotation[0]+e.dx*.35,Math.max(-80,Math.min(80,rotation[1]-e.dy*.35))];projection.rotate(rotation);draw();}));
-});</script></body></html>"""
+root.on('click.clear',e=>{if(!e.defaultPrevented&&Date.now()>=suppressClickUntil&&!e.target.closest('.country'))clearGlobeSelection();});
+const touchMode=window.matchMedia('(pointer:coarse)').matches;
+root.call(d3.drag().touchable(()=>!touchMode).on('start',()=>resetIntel()).on('drag',e=>{rotation=[rotation[0]+e.dx*.35,Math.max(-80,Math.min(80,rotation[1]-e.dy*.35))];projection.rotate(rotation);draw();}));
+let touchStart=null,touchDragged=false;
+const globeEl=document.getElementById('globe');
+globeEl.onpointerdown=e=>{if(e.pointerType!=='touch')return;touchStart={x:e.clientX,y:e.clientY,rotation:rotation.slice()};touchDragged=false;};
+globeEl.onpointermove=e=>{if(!touchStart||e.pointerType!=='touch')return;const dx=e.clientX-touchStart.x,dy=e.clientY-touchStart.y;if(!touchDragged&&(Math.abs(dx)<10||Math.abs(dx)<Math.abs(dy)*1.3))return;touchDragged=true;e.preventDefault();if(globeEl.setPointerCapture)globeEl.setPointerCapture(e.pointerId);resetIntel();rotation=[touchStart.rotation[0]+dx*.3,Math.max(-80,Math.min(80,touchStart.rotation[1]-dy*.15))];projection.rotate(rotation);draw();};
+globeEl.onpointerup=()=>{if(touchDragged)suppressClickUntil=Date.now()+300;touchStart=null;};
+globeEl.onpointercancel=()=>{touchStart=null;touchDragged=false;};
+
+});
+let resizeTimer;addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(args)dispatchEvent(new MessageEvent('message',{data:{type:'streamlit:render',args}}));},150);});
+</script></body></html>"""
 
 
 def monitor_reports(items,layer):
@@ -1755,7 +1825,8 @@ def country_hover_details(code,items,election_rows,catalog,layer,already_matched
 
 def world_monitor(items):
     st.markdown('<div class="monitor-heading world-monitor-title">WORLD MONITOR</div>',unsafe_allow_html=True)
-    controls,selector,settings=st.columns([2,2,1])
+    with st.container(key="monitor_controls"):
+        controls,selector,settings=st.columns([2,2,1])
     layer=controls.segmented_control("Monitor focus",["All","Conflicts","Elections"],default="All",selection_mode="single",key="world_layer",label_visibility="collapsed") or "All"
     catalog=country_catalog()
     ordered=sorted(catalog,key=lambda code:catalog[code]["name"])
@@ -1825,6 +1896,10 @@ def world_monitor(items):
             props["intel"]=country_hover_details(code,hover_by_country.get(code,[]),elections.get(code,[]),catalog,layer,already_matched=True)
             f["properties"]=props
             features.append(f)
+        if map_view=="Globe" and not any(f["properties"]["code"]=="MLT" for f in features):
+            malta_elections=elections.get("MLT",[])
+            malta_dates=election_countdowns(malta_elections)
+            features.append({"type":"Feature","id":"MLT","geometry":{"type":"Point","coordinates":[14.3754,35.9375]},"properties":{"code":"MLT","Country":"Malta","Articles":counts.get("MLT",0),"Calendar elections":len(malta_elections),"highlight":bool(counts.get("MLT") or malta_elections),"fill":map_highlight(bool(conflict_counts.get("MLT")),bool(election_counts.get("MLT") or malta_elections),counts.get("MLT",0)),"Next national vote":malta_dates[0]["Date"] if malta_dates else "No calendar entry","intel":country_hover_details("MLT",hover_by_country.get("MLT",[]),malta_elections,catalog,layer,already_matched=True)}})
         boundaries={"type":"FeatureCollection","features":features}
 
         if map_view=="Globe":
@@ -1950,7 +2025,7 @@ def overview_panel(items, errors, change_items=None):
         if not groups:st.caption("No additional reporting in this desk and story window.")
         for index,group in enumerate(groups):
             item=group[0]
-            with st.container(border=False):
+            with st.container(border=False,key="wire_row_"+str(index)):
                 content,brief,source=st.columns([8,1,1])
                 with content:
                     st.markdown('<div class="wire-row"><span class="wire-index">'+f'{index+1:02d}'+'</span><div><span class="tag">'+escape(item['category'].upper())+'</span><div class="wire-headline">'+escape(item['title'])+'</div><span class="wire-meta">'+escape(item['source']+' · '+timestamp(item['published']))+'</span></div></div>',unsafe_allow_html=True)
@@ -2311,7 +2386,7 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.22-16")
+    st.caption("REVISION 2026.10.23-01")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"],key="channel")
     news_scope=st.selectbox("NEWS COVERAGE",["Major developments","All reporting"],key="news_scope",help="Keyword-based filter for policy, elections, conflicts and major economic developments. Sports keeps its own coverage. Choose All reporting for broader coverage.")
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
