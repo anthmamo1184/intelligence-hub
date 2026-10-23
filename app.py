@@ -1635,7 +1635,7 @@ GLOBE_HTML = r"""<!doctype html><html><head><meta name="viewport" content="width
  .profile-actions{position:static;display:flex;flex-wrap:wrap;margin-top:10px;gap:7px}.profile-actions button{min-height:40px;padding:8px 10px;font-size:11px}
  #leader{display:none!important}
 }
-</style></head><body><div id="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-reset" aria-label="Reset globe view">Reset</button><span id="zoom-value">1.0×</span></div><div id="tip"></div><svg id="globe" aria-label="Interactive world globe" role="img"></svg><svg id="leader" aria-hidden="true"><polyline id="callout-line" fill="none" stroke="#65d6d0" stroke-width="1"/><circle id="callout-dot" r="3" fill="#65d6d0"/></svg><script>
+#rotate-controls{position:absolute;top:267px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:3}#rotate-controls button{background:#102a39;color:#a5e9e4;border:1px solid #34596b;border-radius:4px;width:38px;height:30px;font:17px monospace;cursor:pointer}@media(min-width:640px){#rotate-controls{display:none}}</style></head><body><div id="rotate-controls" aria-label="Rotate globe"><button id="rotate-left" aria-label="Rotate west">←</button><button id="rotate-up" aria-label="Rotate north">↑</button><button id="rotate-down" aria-label="Rotate south">↓</button><button id="rotate-right" aria-label="Rotate east">→</button></div><div id="zoom-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-reset" aria-label="Reset globe view">Reset</button><span id="zoom-value">1.0×</span></div><div id="tip"></div><svg id="globe" aria-label="Interactive world globe" role="img"></svg><svg id="leader" aria-hidden="true"><polyline id="callout-line" fill="none" stroke="#65d6d0" stroke-width="1"/><circle id="callout-dot" r="3" fill="#65d6d0"/></svg><script>
 let lastFrameHeight=null;const send=(type,extra={})=>{if(type==='streamlit:setFrameHeight'){if(extra.height===lastFrameHeight)return;lastFrameHeight=extra.height;}parent.postMessage({isStreamlitMessage:true,type,...extra},'*');};
 send('streamlit:componentReady',{apiVersion:1});send('streamlit:setFrameHeight',{height:globeHeight(document.body.clientWidth)});
 const tip=document.getElementById('tip');
@@ -1686,6 +1686,10 @@ tip.addEventListener('mouseenter',cancelHover);tip.addEventListener('mouseleave'
 document.getElementById('globe').addEventListener('mouseenter',()=>clearTimeout(hideTimer));
 document.getElementById('globe').addEventListener('mouseleave',delayedHide);
 let pinnedCode=null;
+let selectionCleared=false,drawFrame=null;
+function beginRotation(){if(pinnedCode){selectionCleared=true;pinnedCode=null;if(args)args.pinned=null;}resetIntel(true);}
+function finishRotation(){if(selectionCleared){selectionCleared=false;send('streamlit:setComponentValue',{value:{action:'clear',nonce:Date.now()},dataType:'json'});}}
+function scheduleDraw(){if(drawFrame!==null)return;drawFrame=requestAnimationFrame(()=>{drawFrame=null;if(draw)draw();});}
 let args,rotation=[-15,-20],draw,lastRegion,zoomLevel=1,suppressClickUntil=0;
 addEventListener('message',e=>{if(e.data.type!=='streamlit:render')return;args=e.data.args;pinnedCode=args.pinned||null;resetIntel(true,false);if(args.region!==lastRegion){rotation=[-args.center[1],-args.center[0]];lastRegion=args.region;}
 if(!window.d3){document.getElementById('tip').textContent='Globe unavailable — use Flat map or country search';return;}
@@ -1713,7 +1717,7 @@ if(malta){
  maltaMarker.on('keydown',function(e){if(e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();cancelHover();pinnedCode='MLT';const xy=projection(maltaPoint);showIntel({clientX:xy[0],clientY:xy[1]},malta);send('streamlit:setComponentValue',{value:{code:'MLT',action:'pin',nonce:Date.now()},dataType:'json'});});
  maltaLabel=svg.append('text').attr('fill','#a6f0e7').attr('font-size',9).attr('font-family','monospace').attr('pointer-events','none').text('MALTA');
 }
-draw=()=>{svg.selectAll('path').attr('d',path);if(maltaMarker){const xy=projection(maltaPoint),visible=d3.geoDistance(maltaPoint,[-rotation[0],-rotation[1]])<Math.PI/2;maltaMarker.attr('cx',xy[0]).attr('cy',xy[1]).attr('display',visible?null:'none');maltaLabel.attr('x',xy[0]+10).attr('y',xy[1]+3).attr('display',visible&&zoomLevel>=2?null:'none');}if(pinnedCode){const f=features.find(f=>f.properties.code===pinnedCode);if(f){const center=d3.geoCentroid(f),xy=projection(center),visible=d3.geoDistance(center,[-rotation[0],-rotation[1]])<Math.PI/2;showIntel({clientX:visible?xy[0]:calloutLayout(width).cx,clientY:visible?xy[1]:height/2},f);if(!visible)document.getElementById('leader').style.display='none';}}};draw();if(!pinnedCode)send('streamlit:setFrameHeight',{height:height});
+draw=()=>{svg.selectAll('path').attr('d',path);if(maltaMarker){const xy=projection(maltaPoint),visible=d3.geoDistance(maltaPoint,[-rotation[0],-rotation[1]])<Math.PI/2;maltaMarker.attr('cx',xy[0]).attr('cy',xy[1]).attr('display',visible?null:'none');maltaLabel.attr('x',xy[0]+10).attr('y',xy[1]+3).attr('display',visible&&zoomLevel>=2?null:'none');}if(pinnedCode){const f=features.find(f=>f.properties.code===pinnedCode);if(f){const center=d3.geoCentroid(f),xy=projection(center),visible=d3.geoDistance(center,[-rotation[0],-rotation[1]])<Math.PI/2;if(tip.style.display!=='block')showIntel({clientX:visible?xy[0]:calloutLayout(width).cx,clientY:visible?xy[1]:height/2},f);else positionIntel({clientX:visible?xy[0]:calloutLayout(width).cx,clientY:visible?xy[1]:height/2});if(!visible)document.getElementById('leader').style.display='none';}}};draw();if(!pinnedCode)send('streamlit:setFrameHeight',{height:height});
 function changeZoom(next){zoomLevel=Math.max(1,Math.min(8,next));projection.scale(r*zoomLevel);document.getElementById('zoom-value').textContent=zoomLevel.toFixed(1)+'×';resetIntel();draw();}
 document.getElementById('zoom-in').onclick=()=>changeZoom(zoomLevel*1.25);document.getElementById('zoom-out').onclick=()=>changeZoom(zoomLevel/1.25);
 document.getElementById('zoom-reset').onclick=()=>{clearGlobeSelection();rotation=[-args.center[1],-args.center[0]];projection.rotate(rotation);changeZoom(1);};
@@ -1722,13 +1726,18 @@ document.getElementById('globe').onwheel=e=>{e.preventDefault();if(e.deltaY===0)
 
 root.on('click.clear',e=>{if(!e.defaultPrevented&&Date.now()>=suppressClickUntil&&!e.target.closest('.country'))clearGlobeSelection();});
 const touchMode=window.matchMedia('(pointer:coarse)').matches;
-root.call(d3.drag().touchable(()=>!touchMode).on('start',()=>resetIntel()).on('drag',e=>{rotation=[rotation[0]+e.dx*.35,Math.max(-80,Math.min(80,rotation[1]-e.dy*.35))];projection.rotate(rotation);draw();}));
+root.call(d3.drag().touchable(()=>!touchMode).on('drag',e=>{beginRotation();rotation=[rotation[0]+e.dx*.35,Math.max(-80,Math.min(80,rotation[1]-e.dy*.35))];projection.rotate(rotation);scheduleDraw();}).on('end',finishRotation));
 let touchStart=null,touchDragged=false;
 const globeEl=document.getElementById('globe');
 globeEl.onpointerdown=e=>{if(e.pointerType!=='touch')return;touchStart={x:e.clientX,y:e.clientY,rotation:rotation.slice()};touchDragged=false;};
-globeEl.onpointermove=e=>{if(!touchStart||e.pointerType!=='touch')return;const dx=e.clientX-touchStart.x,dy=e.clientY-touchStart.y;if(!touchDragged&&(Math.abs(dx)<10||Math.abs(dx)<Math.abs(dy)*1.3))return;touchDragged=true;e.preventDefault();if(globeEl.setPointerCapture)globeEl.setPointerCapture(e.pointerId);resetIntel();rotation=[touchStart.rotation[0]+dx*.3,Math.max(-80,Math.min(80,touchStart.rotation[1]-dy*.15))];projection.rotate(rotation);draw();};
-globeEl.onpointerup=()=>{if(touchDragged)suppressClickUntil=Date.now()+300;touchStart=null;};
-globeEl.onpointercancel=()=>{touchStart=null;touchDragged=false;};
+globeEl.onpointermove=e=>{if(!touchStart||e.pointerType!=='touch')return;const dx=e.clientX-touchStart.x,dy=e.clientY-touchStart.y;if(!touchDragged&&(Math.abs(dx)<10||Math.abs(dx)<Math.abs(dy)*1.3))return;if(!touchDragged)beginRotation();touchDragged=true;e.preventDefault();if(globeEl.setPointerCapture)globeEl.setPointerCapture(e.pointerId);resetIntel();rotation=[touchStart.rotation[0]+dx*.3,Math.max(-80,Math.min(80,touchStart.rotation[1]-dy*.15))];projection.rotate(rotation);scheduleDraw();};
+globeEl.onpointerup=()=>{if(touchDragged){suppressClickUntil=Date.now()+500;finishRotation();}touchStart=null;};
+globeEl.onpointercancel=()=>{finishRotation();touchStart=null;touchDragged=false;};
+function stepRotation(dx,dy){beginRotation();rotation=[rotation[0]+dx,Math.max(-80,Math.min(80,rotation[1]+dy))];projection.rotate(rotation);draw();finishRotation();}
+document.getElementById('rotate-left').onclick=()=>stepRotation(-25,0);
+document.getElementById('rotate-right').onclick=()=>stepRotation(25,0);
+document.getElementById('rotate-up').onclick=()=>stepRotation(0,20);
+document.getElementById('rotate-down').onclick=()=>stepRotation(0,-20);
 
 });
 let resizeTimer;addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(args)dispatchEvent(new MessageEvent('message',{data:{type:'streamlit:render',args}}));},150);});
@@ -2386,7 +2395,7 @@ if not st.session_state.get("eur_defaults_20261022_04"):
 
 with st.sidebar:
     st.markdown("## ◈ CONTROL PANEL")
-    st.caption("REVISION 2026.10.23-01")
+    st.caption("REVISION 2026.10.23-02")
     section = st.radio("CHANNEL", ["Overview", "World", "Politics", "Sports", "Conflicts", "Elections", "US Elections", "Commodities", "Markets", "Crypto", "Economic Calendar", "Sources"],key="channel")
     news_scope=st.selectbox("NEWS COVERAGE",["Major developments","All reporting"],key="news_scope",help="Keyword-based filter for policy, elections, conflicts and major economic developments. Sports keeps its own coverage. Choose All reporting for broader coverage.")
     search = st.text_input("SEARCH FEED", placeholder="Country, team, company…")
